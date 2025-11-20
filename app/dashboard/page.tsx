@@ -10,32 +10,26 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ModeToggle } from '@/components/mode-toggle'
 
 const mockDocuments = [
-  { id: 1, title: 'Technical Specification Document', tags: ['Engineering', 'Specs'], people: ['John Doe'], location: 'US', date: '2024-01-15' },
-  { id: 2, title: 'Research Paper: AI Systems', tags: ['Research', 'AI'], people: ['Jane Smith'], location: 'UK', date: '2024-02-20' },
-  { id: 3, title: 'Product Requirements', tags: ['Product', 'Planning'], people: ['Bob Johnson'], location: 'Canada', date: '2024-03-10' },
-  { id: 4, title: 'Architecture Design', tags: ['Engineering', 'Design'], people: ['Alice Brown'], location: 'US', date: '2024-01-25' },
-  { id: 5, title: 'Market Analysis Report', tags: ['Business', 'Research'], people: ['Charlie Wilson'], location: 'Germany', date: '2024-02-05' },
-  { id: 6, title: 'User Experience Study', tags: ['UX', 'Research'], people: ['Diana Lee'], location: 'Japan', date: '2024-03-15' },
+  { id: 1, title: 'Technical Specification Document', tags: ['Engineering', 'Specs'], date: '2024-01-15' },
+  { id: 2, title: 'Research Paper: AI Systems', tags: ['Research', 'AI'], date: '2024-02-20' },
+  { id: 3, title: 'Product Requirements', tags: ['Product', 'Planning'], date: '2024-03-10' },
+  { id: 4, title: 'Architecture Design', tags: ['Engineering', 'Design'], date: '2024-01-25' },
+  { id: 5, title: 'Market Analysis Report', tags: ['Business', 'Research'], date: '2024-02-05' },
+  { id: 6, title: 'User Experience Study', tags: ['UX', 'Research'], date: '2024-03-15' },
 ]
 
 const filterCategories = {
   tags: ['Engineering', 'Research', 'AI', 'Product', 'Planning', 'Design', 'Business', 'UX'],
-  people: ['John Doe', 'Jane Smith', 'Bob Johnson', 'Alice Brown', 'Charlie Wilson', 'Diana Lee'],
-  location: ['US', 'UK', 'Canada', 'Germany', 'Japan'],
 }
 
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    tags: true,
-    people: false,
-    location: false,
+    tags: true
   })
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     tags: [],
-    people: [],
-    location: [],
   })
 
   const toggleCategory = (category: string) => {
@@ -55,9 +49,7 @@ export default function DashboardPage() {
   const filteredDocuments = mockDocuments.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesTags = selectedFilters.tags.length === 0 || doc.tags.some(tag => selectedFilters.tags.includes(tag))
-    const matchesPeople = selectedFilters.people.length === 0 || doc.people.some(person => selectedFilters.people.includes(person))
-    const matchesLocation = selectedFilters.location.length === 0 || selectedFilters.location.includes(doc.location)
-    return matchesSearch && matchesTags && matchesPeople && matchesLocation
+    return matchesSearch && matchesTags
   })
 
   return (
@@ -124,26 +116,6 @@ export default function DashboardPage() {
                   selectedItems={selectedFilters.tags}
                   onItemToggle={(item) => toggleFilter('tags', item)}
                 />
-
-                {/* People Filter */}
-                <FilterCategory
-                  title="People"
-                  items={filterCategories.people}
-                  expanded={expandedCategories.people}
-                  onToggle={() => toggleCategory('people')}
-                  selectedItems={selectedFilters.people}
-                  onItemToggle={(item) => toggleFilter('people', item)}
-                />
-
-                {/* Location Filter */}
-                <FilterCategory
-                  title="Location"
-                  items={filterCategories.location}
-                  expanded={expandedCategories.location}
-                  onToggle={() => toggleCategory('location')}
-                  selectedItems={selectedFilters.location}
-                  onItemToggle={(item) => toggleFilter('location', item)}
-                />
               </div>
             </motion.aside>
           )}
@@ -205,16 +177,6 @@ export default function DashboardPage() {
                             {tag}
                           </span>
                         ))}
-                      </div>
-                      
-                      {/* People */}
-                      <div className="hidden lg:block text-sm text-muted-foreground min-w-[120px] text-right">
-                        {doc.people[0]}
-                      </div>
-                      
-                      {/* Location */}
-                      <div className="hidden xl:block text-sm text-muted-foreground min-w-[80px] text-right">
-                        {doc.location}
                       </div>
                     </div>
                   </div>

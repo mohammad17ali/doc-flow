@@ -18,21 +18,21 @@ export default function LandingPage() {
             </div>
             <h1 className="text-lg font-bold tracking-tight">DocuStructure</h1>
           </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
+          {/* <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
             <Link href="#" className="hover:text-foreground transition-colors">Features</Link>
             <Link href="#" className="hover:text-foreground transition-colors">Methodology</Link>
             <Link href="#" className="hover:text-foreground transition-colors">Enterprise</Link>
-          </nav>
+          </nav> */}
           <div className="flex items-center gap-4">
             <ModeToggle />
-            <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
+            {/* <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
               Log in
             </Link>
             <Link href="/dashboard">
               <Button className="bg-foreground text-background hover:bg-foreground/90 font-medium h-9 px-4">
                 Dashboard
               </Button>
-            </Link>
+            </Link> */}
           </div>
         </div>
       </header>
