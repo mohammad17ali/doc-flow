@@ -16,8 +16,15 @@ if (typeof Promise !== 'undefined' && !(Promise as any).withResolvers) {
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Layers, ChevronDown, Download, GripVertical } from 'lucide-react'
+import { ArrowLeft, Layers, ChevronDown, Download, GripVertical, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Document, Page, pdfjs } from 'react-pdf'
 import * as Accordion from '@radix-ui/react-accordion'
 import { ModeToggle } from '@/components/mode-toggle'
@@ -57,6 +64,7 @@ export default function ViewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string>('')
+  const [contentFilter, setContentFilter] = useState<'all' | 'text' | 'table'>('all')
 
   useEffect(() => {
     // Fetch the document structure from the backend
@@ -226,6 +234,21 @@ export default function ViewPage() {
         >
           <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b border-border px-4 py-2 flex items-center justify-between">
              <span className="text-xs font-mono text-muted-foreground">STRUCTURED DATA</span>
+             <DropdownMenu>
+               <DropdownMenuTrigger asChild>
+                 <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                   <Filter className="w-3 h-3" />
+                   {contentFilter === 'all' ? 'All' : contentFilter === 'text' ? 'Text' : 'Tables'}
+                 </Button>
+               </DropdownMenuTrigger>
+               <DropdownMenuContent align="end" className="w-32">
+                 <DropdownMenuRadioGroup value={contentFilter} onValueChange={(value) => setContentFilter(value as 'all' | 'text' | 'table')}>
+                   <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                   <DropdownMenuRadioItem value="text">Text</DropdownMenuRadioItem>
+                   <DropdownMenuRadioItem value="table">Tables</DropdownMenuRadioItem>
+                 </DropdownMenuRadioGroup>
+               </DropdownMenuContent>
+             </DropdownMenu>
           </div>
           <div className="p-6">
             {loading ? (
@@ -242,7 +265,7 @@ export default function ViewPage() {
                 </Link>
               </div>
             ) : documentData ? (
-              <JsonAccordion node={documentData.root} depth={0} title="Document Root" />
+              <JsonAccordion node={documentData.root} depth={0} title="Document Root" filter={contentFilter} />
             ) : (
               <div className="text-muted-foreground text-sm">No document data available</div>
             )}
@@ -315,7 +338,29 @@ export default function ViewPage() {
   )
 }
 
-function JsonAccordion({ node, depth = 0, title }: { node: DocumentNode; depth?: number; title: string }) {
+// Helper function to check if a node or its children have matching content
+function nodeHasMatchingContent(node: DocumentNode, filter: 'all' | 'text' | 'table'): boolean {
+  // Check if this node has matching content
+  if (node.content && node.content.length > 0) {
+    const hasMatchingContent = node.content.some((item: ContentItem) => {
+      if (filter === 'all') return true
+      return item.type === filter
+    })
+    if (hasMatchingContent) return true
+  }
+  
+  // Check children recursively
+  if (node.children && node.children.length > 0) {
+    return node.children.some((childObj: Record<string, DocumentNode>) => {
+      const childNode = childObj[Object.keys(childObj)[0]]
+      return nodeHasMatchingContent(childNode, filter)
+    })
+  }
+  
+  return false
+}
+
+function JsonAccordion({ node, depth = 0, title, filter = 'all' }: { node: DocumentNode; depth?: number; title: string; filter?: 'all' | 'text' | 'table' }) {
   // Define color schemes for each level (up to 5 levels)
   const levelColors = [
     { 
@@ -370,8 +415,27 @@ function JsonAccordion({ node, depth = 0, title }: { node: DocumentNode; depth?:
     }
   }
 
+  // Filter content based on selected filter
+  const filteredContent = node.content ? node.content.filter((item: ContentItem) => {
+    if (filter === 'all') return true
+    return item.type === filter
+  }) : []
+
+  // Check if this node has matching content
+  const hasMatchingContent = filteredContent.length > 0
+  
+  // Check if any children have matching content (recursive check)
+  const hasMatchingChildren = node.children && node.children.some((childObj: Record<string, DocumentNode>) => {
+    const childNode = childObj[Object.keys(childObj)[0]]
+    return nodeHasMatchingContent(childNode, filter)
+  })
+
+  // Only render this node if it has matching content or matching children
+  if (!hasMatchingContent && !hasMatchingChildren) {
+    return null
+  }
+
   const hasChildren = node.children && node.children.length > 0
-  const hasContent = node.content && node.content.length > 0
 
   return (
     <div className={depth > 0 ? 'ml-4 pl-4 border-l border-border/50 mt-2' : ''}>
@@ -389,9 +453,9 @@ function JsonAccordion({ node, depth = 0, title }: { node: DocumentNode; depth?:
             </Accordion.Trigger>
           </Accordion.Header>
           <Accordion.Content className="px-4 pb-4 pt-2 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
-            {hasContent && (
+            {hasMatchingContent && (
               <div className="space-y-3 mb-4">
-                {node.content.map((item: ContentItem, idx: number) => (
+                {filteredContent.map((item: ContentItem, idx: number) => (
                   <div 
                     key={idx} 
                     className={`p-3 rounded-md border ${colors.border} ${colors.bg} bg-opacity-50 overflow-hidden min-w-0`}
@@ -448,6 +512,7 @@ function JsonAccordion({ node, depth = 0, title }: { node: DocumentNode; depth?:
                       node={childNode} 
                       depth={depth + 1} 
                       title={childKey}
+                      filter={filter}
                     />
                   )
                 })}

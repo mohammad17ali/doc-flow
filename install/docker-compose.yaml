@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      args:
+        - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+    container_name: doc-flow-backend
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - PDF_RESULTS_DIR=/pdf-results
+    volumes:
+      - ${HOME}/pdf-results:/pdf-results:ro
+    networks:
+      - doc-flow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5001}
+    container_name: doc-flow-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://10.138.190.67:5001
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - doc-flow-network
+    restart: unless-stopped
+
+networks:
+  doc-flow-network:
+    driver: bridge
