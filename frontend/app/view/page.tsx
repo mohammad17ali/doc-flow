@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Layers, ChevronDown, Download, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Document, Page, pdfjs } from 'react-pdf'
@@ -9,8 +10,23 @@ import * as Accordion from '@radix-ui/react-accordion'
 import { ModeToggle } from '@/components/mode-toggle'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { getDocumentById } from '@/lib/api'
+import { DocumentStructure } from '@/types/document'
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css'
 import 'react-pdf/dist/esm/Page/TextLayer.css'
+
+// Polyfill for Promise.withResolvers if not available
+if (typeof Promise !== 'undefined' && !Promise.withResolvers) {
+  Promise.withResolvers = function <T>() {
+    let resolve: (value: T | PromiseLike<T>) => void;
+    let reject: (reason?: any) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve: resolve!, reject: reject! };
+  };
+}
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
@@ -32,6 +48,9 @@ interface DocumentStructure {
 }
 
 export default function ViewPage() {
+  const searchParams = useSearchParams()
+  const documentId = searchParams.get('id')
+  
   const [numPages, setNumPages] = useState<number>(0)
   const [pageNumber, setPageNumber] = useState<number>(1)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
@@ -41,14 +60,38 @@ export default function ViewPage() {
   const isDragging = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [documentData, setDocumentData] = useState<DocumentStructure | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [pdfUrl, setPdfUrl] = useState<string>('')
 
   useEffect(() => {
-    // Load the document structure from the JSON file
-    fetch('/expected-doc-structure.json')
-      .then(res => res.json())
-      .then(data => setDocumentData(data))
-      .catch(err => console.error('Failed to load document structure:', err))
-  }, [])
+    // Fetch the document structure from the backend
+    const fetchDocument = async () => {
+      if (!documentId) {
+        setError('No document ID provided')
+        setLoading(false)
+        return
+      }
+
+      try {
+        setLoading(true)
+        const data = await getDocumentById(documentId)
+        setDocumentData(data)
+        
+        // Set the PDF URL based on the document ID
+        setPdfUrl(`/pdfs/${documentId}.pdf`)
+        
+        setError(null)
+      } catch (err) {
+        console.error('Failed to load document structure:', err)
+        setError('Failed to load document. Please ensure the backend server is running.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDocument()
+  }, [documentId])
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages)
@@ -159,7 +202,9 @@ export default function ViewPage() {
               <Layers className="w-3 h-3 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-foreground">Document Viewer</h1>
+              <h1 className="text-sm font-bold text-foreground">
+                {documentId || 'Document Viewer'}
+              </h1>
             </div>
           </div>
         </div>
@@ -189,10 +234,23 @@ export default function ViewPage() {
              <span className="text-xs font-mono text-muted-foreground">STRUCTURED DATA</span>
           </div>
           <div className="p-6">
-            {documentData ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-muted-foreground animate-pulse">Loading document structure...</div>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <div className="text-destructive text-sm">{error}</div>
+                <Link href="/dashboard">
+                  <Button variant="outline" size="sm">
+                    Back to Dashboard
+                  </Button>
+                </Link>
+              </div>
+            ) : documentData ? (
               <JsonAccordion node={documentData.root} depth={0} title="Document Root" />
             ) : (
-              <div className="text-muted-foreground text-sm animate-pulse">Loading document structure...</div>
+              <div className="text-muted-foreground text-sm">No document data available</div>
             )}
           </div>
         </div>
@@ -221,31 +279,40 @@ export default function ViewPage() {
           </div>
           <div className="p-8 flex justify-center min-h-full">
             <div className="shadow-2xl">
-              <Document
-                file="https://arxiv.org/pdf/1706.03762.pdf"
-                onLoadSuccess={onDocumentLoadSuccess}
-                loading={
-                  <div className="flex items-center justify-center h-96 w-full">
-                    <div className="text-muted-foreground text-sm animate-pulse">Loading Document...</div>
-                  </div>
-                }
-                error={
-                  <div className="flex items-center justify-center h-96 w-full">
-                    <div className="text-destructive text-sm">Failed to load PDF</div>
-                  </div>
-                }
-              >
-                {Array.from(new Array(numPages), (el, index) => (
-                  <Page
-                    key={`page_${index + 1}`}
-                    pageNumber={index + 1}
-                    renderTextLayer={true}
-                    renderAnnotationLayer={true}
-                    className="mb-8 shadow-lg"
-                    width={600}
-                  />
-                ))}
-              </Document>
+              {pdfUrl ? (
+                <Document
+                  file={pdfUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  loading={
+                    <div className="flex items-center justify-center h-96 w-full">
+                      <div className="text-muted-foreground text-sm animate-pulse">Loading PDF...</div>
+                    </div>
+                  }
+                  error={
+                    <div className="flex flex-col items-center justify-center h-96 w-full gap-4">
+                      <div className="text-destructive text-sm">Failed to load PDF</div>
+                      <div className="text-muted-foreground text-xs">
+                        Make sure {documentId}.pdf exists in the public/pdfs folder
+                      </div>
+                    </div>
+                  }
+                >
+                  {Array.from(new Array(numPages), (el, index) => (
+                    <Page
+                      key={`page_${index + 1}`}
+                      pageNumber={index + 1}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={true}
+                      className="mb-8 shadow-lg"
+                      width={600}
+                    />
+                  ))}
+                </Document>
+              ) : (
+                <div className="flex items-center justify-center h-96 w-full">
+                  <div className="text-muted-foreground text-sm">No PDF available</div>
+                </div>
+              )}
             </div>
           </div>
         </div>

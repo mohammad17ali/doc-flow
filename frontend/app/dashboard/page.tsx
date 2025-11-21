@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Filter, FileText, ChevronDown, ChevronRight, Menu, X, Layers } from 'lucide-react'
@@ -8,15 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ModeToggle } from '@/components/mode-toggle'
-
-const mockDocuments = [
-  { id: 1, title: 'Technical Specification Document', tags: ['Engineering', 'Specs'], date: '2024-01-15' },
-  { id: 2, title: 'Research Paper: AI Systems', tags: ['Research', 'AI'], date: '2024-02-20' },
-  { id: 3, title: 'Product Requirements', tags: ['Product', 'Planning'], date: '2024-03-10' },
-  { id: 4, title: 'Architecture Design', tags: ['Engineering', 'Design'], date: '2024-01-25' },
-  { id: 5, title: 'Market Analysis Report', tags: ['Business', 'Research'], date: '2024-02-05' },
-  { id: 6, title: 'User Experience Study', tags: ['UX', 'Research'], date: '2024-03-15' },
-]
+import { getAllDocuments } from '@/lib/api'
+import { DocumentMetadata } from '@/types/document'
 
 const filterCategories = {
   tags: ['Engineering', 'Research', 'AI', 'Product', 'Planning', 'Design', 'Business', 'UX'],
@@ -31,6 +24,28 @@ export default function DashboardPage() {
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     tags: [],
   })
+  const [documents, setDocuments] = useState<DocumentMetadata[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch documents from the backend
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        setLoading(true)
+        const data = await getAllDocuments()
+        setDocuments(data)
+        setError(null)
+      } catch (err) {
+        console.error('Failed to fetch documents:', err)
+        setError('Failed to load documents. Please ensure the backend server is running.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDocuments()
+  }, [])
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }))
@@ -46,9 +61,15 @@ export default function DashboardPage() {
     })
   }
 
-  const filteredDocuments = mockDocuments.filter(doc => {
-    const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesTags = selectedFilters.tags.length === 0 || doc.tags.some(tag => selectedFilters.tags.includes(tag))
+  // Extract unique tags from documents for filtering
+  const allTags = Array.from(new Set(documents.flatMap(doc => 
+    doc.hasOutputTree ? ['Processed'] : ['Unprocessed']
+  )))
+
+  const filteredDocuments = documents.filter(doc => {
+    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const docTags = doc.hasOutputTree ? ['Processed'] : ['Unprocessed']
+    const matchesTags = selectedFilters.tags.length === 0 || docTags.some(tag => selectedFilters.tags.includes(tag))
     return matchesSearch && matchesTags
   })
 
@@ -110,7 +131,7 @@ export default function DashboardPage() {
                 {/* Tags Filter */}
                 <FilterCategory
                   title="Tags"
-                  items={filterCategories.tags}
+                  items={allTags}
                   expanded={expandedCategories.tags}
                   onToggle={() => toggleCategory('tags')}
                   selectedItems={selectedFilters.tags}
@@ -149,40 +170,65 @@ export default function DashboardPage() {
 
           {/* Document List */}
           <div className="space-y-3">
-            {filteredDocuments.map((doc, index) => (
-              <motion.div
-                key={doc.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-              >
-                <Link href="/view">
-                  <div className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 hover:shadow-[0_0_20px_-8px_rgba(0,104,181,0.3)] transition-all cursor-pointer group">
-                    <div className="flex items-center gap-4">
-                      {/* Icon */}
-                      <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center group-hover:bg-primary transition-colors shrink-0">
-                        <FileText className="w-5 h-5 text-muted-foreground group-hover:text-primary-foreground" />
-                      </div>
-                      
-                      {/* Title and Date */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground mb-0.5 truncate">{doc.title}</h3>
-                        <p className="text-xs text-muted-foreground font-mono">{doc.date}</p>
-                      </div>
-                      
-                      {/* Tags */}
-                      <div className="hidden md:flex flex-wrap gap-2 max-w-xs">
-                        {doc.tags.map(tag => (
-                          <span key={tag} className="px-2 py-0.5 bg-secondary border border-border text-secondary-foreground text-[10px] uppercase tracking-wide rounded whitespace-nowrap">
-                            {tag}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-muted-foreground animate-pulse">Loading documents...</div>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <div className="text-destructive text-sm">{error}</div>
+                <Button 
+                  onClick={() => window.location.reload()} 
+                  variant="outline"
+                  size="sm"
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : filteredDocuments.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-muted-foreground text-sm">No documents found</div>
+              </div>
+            ) : (
+              filteredDocuments.map((doc, index) => (
+                <motion.div
+                  key={doc.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                >
+                  <Link href={`/view?id=${doc.id}`}>
+                    <div className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 hover:shadow-[0_0_20px_-8px_rgba(0,104,181,0.3)] transition-all cursor-pointer group">
+                      <div className="flex items-center gap-4">
+                        {/* Icon */}
+                        <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center group-hover:bg-primary transition-colors shrink-0">
+                          <FileText className="w-5 h-5 text-muted-foreground group-hover:text-primary-foreground" />
+                        </div>
+                        
+                        {/* Title and ID */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground mb-0.5 truncate">{doc.name}</h3>
+                          <p className="text-xs text-muted-foreground font-mono">{doc.id}</p>
+                        </div>
+                        
+                        {/* Tags */}
+                        <div className="hidden md:flex flex-wrap gap-2 max-w-xs">
+                          <span 
+                            className={`px-2 py-0.5 border text-[10px] uppercase tracking-wide rounded whitespace-nowrap ${
+                              doc.hasOutputTree 
+                                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' 
+                                : 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                            }`}
+                          >
+                            {doc.hasOutputTree ? 'Processed' : 'Unprocessed'}
                           </span>
-                        ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                  </Link>
+                </motion.div>
+              ))
+            )}
           </div>
         </main>
       </div>
