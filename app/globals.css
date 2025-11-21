@@ -1,5 +1,4 @@
 @import "tailwindcss";
-
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -43,7 +42,28 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* Light theme with Intel Blue branding */
+@font-face {
+  font-family: 'Source Code Pro';
+  src: url('/fonts/source-code-pro/SourceCodePro-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Source Code Pro';
+  src: url('/fonts/source-code-pro/SourceCodePro-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Source Code Pro';
+  src: url('/fonts/source-code-pro/SourceCodePro-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root, .light {
   --background: #ffffff;
   --foreground: #0f172a;
@@ -80,7 +100,6 @@
   --sidebar-ring: #0068B5;
 }
 
-/* Dark theme with Intel Blue branding */
 .dark {
   --background: #000000;
   --foreground: #ffffff;
@@ -125,21 +144,107 @@
   }
 }
 
-/* Custom Scrollbar */
+
+@layer components {
+  .markdown-content-box {
+    @apply min-w-0 max-w-full;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    font-weight: 500; 
+    color: var(--foreground); 
+  }
+
+  .markdown-content-box th,
+  .markdown-content-box td,
+  .markdown-content-box p,
+  .markdown-content-box li,
+  .markdown-content-box ul,
+  .markdown-content-box ol {
+    font-weight: 500;
+    color: var(--foreground);
+  }
+
+  .markdown-content-box h1,
+  .markdown-content-box h2,
+  .markdown-content-box h3,
+  .markdown-content-box h4,
+  .markdown-content-box h5,
+  .markdown-content-box h6 {
+    font-weight: 700;
+    color: var(--foreground);
+  }
+
+  .markdown-content-box code {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 0.6875rem;
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+  }
+
+  .dark .markdown-content-box code {
+    background-color: rgba(255, 255, 255, 0.10);
+  }
+
+  .markdown-content-box pre {
+    margin: 0.5rem 0;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    overflow-x: auto;
+    background-color: var(--muted);
+    color: var(--foreground);
+    font-weight: 500;
+  }
+
+  .markdown-content-box pre code {
+    background-color: transparent;
+    padding: 0;
+    font-size: 0.6875rem;
+    font-weight: 500;
+  }
+
+  .markdown-content-box table {
+    font-size: 0.6875rem;
+    margin: 0.5rem 0;
+  }
+
+  .markdown-content-box th,
+  .markdown-content-box td {
+    padding: 0.25rem 0.5rem;
+    border-color: var(--border);
+  }
+
+  .markdown-content-box img {
+    max-width: 100%;
+    height: auto;
+    margin: 0.5rem 0;
+  }
+
+  .markdown-content-box a {
+    color: rgb(59, 130, 246);
+    text-decoration: underline;
+    font-weight: 500;
+  }
+
+  .word-break {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: var(--muted);
 }
-
 ::-webkit-scrollbar-thumb {
   background: var(--primary);
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ring);
 }

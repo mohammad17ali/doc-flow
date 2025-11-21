@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Layers, ChevronDown, Download, GripVertical, Filter } from 'lucide-react'
+import { ArrowLeft, Layers, ChevronDown, Download, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Document, Page, pdfjs } from 'react-pdf'
 import * as Accordion from '@radix-ui/react-accordion'
-import * as Select from '@radix-ui/react-select'
 import { ModeToggle } from '@/components/mode-toggle'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css'
 import 'react-pdf/dist/esm/Page/TextLayer.css'
 
@@ -16,155 +17,18 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 type ContentType = 'text' | 'table' | 'image'
 
-interface DocumentNode {
-  content: string[]
-  children: Record<string, DocumentNode>
-  contentType?: ContentType // Classification for this node
+interface ContentItem {
+  type: ContentType
+  content: string
 }
 
-const dummyJsonStructure: Record<string, DocumentNode> = {
-  "Abstract": {
-    "content": [
-      "This paper presents a comprehensive analysis of hierarchical document structures and their applications in modern information systems.",
-      "We explore various parsing techniques and their effectiveness in extracting semantic meaning from complex documents."
-    ],
-    "contentType": "text",
-    "children": {}
-  },
-  "1. Introduction": {
-    "content": [
-      "Document structure analysis has become increasingly important in the digital age.",
-      "The ability to automatically parse and understand document hierarchies enables better information retrieval and knowledge management."
-    ],
-    "contentType": "text",
-    "children": {
-      "1.1 Background": {
-        "content": [
-          "Traditional document processing relied heavily on manual annotation and classification.",
-          "Recent advances in natural language processing have opened new possibilities for automated structure extraction."
-        ],
-        "contentType": "text",
-        "children": {}
-      },
-      "1.2 Motivation": {
-        "content": [
-          "The exponential growth of digital documents necessitates scalable parsing solutions.",
-          "Hierarchical representations provide intuitive navigation and improved comprehension."
-        ],
-        "contentType": "text",
-        "children": {
-          "Table 1: Performance Metrics": {
-            "content": [
-              "| Metric | Value | Benchmark |",
-              "| Precision | 0.92 | 0.85 |",
-              "| Recall | 0.89 | 0.82 |"
-            ],
-            "contentType": "table",
-            "children": {}
-          }
-        }
-      }
-    }
-  },
-  "2. Methodology": {
-    "content": [
-      "Our approach combines multiple techniques to achieve robust document parsing.",
-      "We leverage both rule-based and machine learning methods for optimal results."
-    ],
-    "contentType": "text",
-    "children": {
-      "2.1 PDF Conversion": {
-        "content": [
-          "We utilize marker-pdf for initial conversion to Markdown format.",
-          "This step preserves structural information while simplifying subsequent processing."
-        ],
-        "contentType": "text",
-        "children": {
-          "2.1.1 Preprocessing": {
-            "content": [
-              "Documents undergo cleaning to remove artifacts and normalize formatting.",
-              "Special attention is paid to handling tables, figures, and mathematical notation."
-            ],
-            "contentType": "text",
-            "children": {}
-          },
-          "Figure 1: System Architecture": {
-            "content": [
-              "[Diagram showing the multi-stage document processing pipeline]"
-            ],
-            "contentType": "image",
-            "children": {}
-          }
-        }
-      },
-      "2.2 Structure Extraction": {
-        "content": [
-          "Table of contents generation uses pdfminer for accurate heading detection.",
-          "Hierarchical relationships are established through heading level analysis."
-        ],
-        "contentType": "text",
-        "children": {
-          "Table 2: Processing Times": {
-            "content": [
-              "| Document Type | Avg Time (s) |",
-              "| Research Paper | 2.3 |",
-              "| Technical Report | 3.1 |"
-            ],
-            "contentType": "table",
-            "children": {}
-          }
-        }
-      },
-      "2.3 Node Creation": {
-        "content": [
-          "A recursive tree structure is built to represent the document hierarchy.",
-          "Each node contains content and references to its children."
-        ],
-        "contentType": "text",
-        "children": {}
-      }
-    }
-  },
-  "3. Results": {
-    "content": [
-      "Our system successfully parsed 95% of test documents with high accuracy.",
-      "Performance metrics demonstrate significant improvements over baseline methods."
-    ],
-    "contentType": "text",
-    "children": {
-      "3.1 Quantitative Analysis": {
-        "content": [
-          "Precision and recall scores exceeded 0.90 across all document types.",
-          "Processing time averaged 2.3 seconds per document."
-        ],
-        "contentType": "text",
-        "children": {}
-      },
-      "Figure 2: Results Comparison": {
-        "content": [
-          "[Bar chart comparing our method with baseline approaches]"
-        ],
-        "contentType": "image",
-        "children": {}
-      },
-      "3.2 Qualitative Evaluation": {
-        "content": [
-          "User studies indicated high satisfaction with the hierarchical representation.",
-          "Navigation efficiency improved by 40% compared to traditional linear views."
-        ],
-        "contentType": "text",
-        "children": {}
-      }
-    }
-  },
-  "4. Conclusion": {
-    "content": [
-      "We have demonstrated an effective approach to hierarchical document parsing.",
-      "Future work will focus on handling more complex document types and multilingual support."
-    ],
-    "contentType": "text",
-    "children": {}
-  }
+interface DocumentNode {
+  content: ContentItem[]
+  children: Array<Record<string, DocumentNode>>
+}
+
+interface DocumentStructure {
+  root: DocumentNode
 }
 
 export default function ViewPage() {
@@ -176,14 +40,23 @@ export default function ViewPage() {
   const [leftWidth, setLeftWidth] = useState(50)
   const isDragging = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [contentFilter, setContentFilter] = useState<'all' | ContentType>('all')
+  const [documentData, setDocumentData] = useState<DocumentStructure | null>(null)
+
+  useEffect(() => {
+    // Load the document structure from the JSON file
+    fetch('/expected-doc-structure.json')
+      .then(res => res.json())
+      .then(data => setDocumentData(data))
+      .catch(err => console.error('Failed to load document structure:', err))
+  }, [])
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages)
   }
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(dummyJsonStructure, null, 2)
+    if (!documentData) return
+    const dataStr = JSON.stringify(documentData, null, 2)
     const dataBlob = new Blob([dataStr], { type: 'application/json' })
     const url = URL.createObjectURL(dataBlob)
     const link = document.createElement('a')
@@ -270,28 +143,6 @@ export default function ViewPage() {
     }
   }, [isScrolling])
 
-  const nodeMatchesFilter = (node: DocumentNode, filter: 'all' | ContentType): boolean => {
-    if (filter === 'all') return true
-    
-    // Check current node
-    if (node.contentType === filter) return true
-    
-    // Check children recursively
-    return Object.values(node.children).some(child => nodeMatchesFilter(child, filter))
-  }
-
-  const getFilteredData = () => {
-    if (contentFilter === 'all') return dummyJsonStructure
-    
-    const filtered: Record<string, DocumentNode> = {}
-    Object.entries(dummyJsonStructure).forEach(([key, value]) => {
-      if (nodeMatchesFilter(value, contentFilter)) {
-        filtered[key] = value
-      }
-    })
-    return filtered
-  }
-
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       {/* Header */}
@@ -323,9 +174,6 @@ export default function ViewPage() {
              <Download className="w-3 h-3 mr-1.5" />
              Export JSON
            </Button>
-           <Button size="sm" className="h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90">
-             Share
-           </Button>
         </div>
       </header>
 
@@ -339,34 +187,13 @@ export default function ViewPage() {
         >
           <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b border-border px-4 py-2 flex items-center justify-between">
              <span className="text-xs font-mono text-muted-foreground">STRUCTURED DATA</span>
-             <Select.Root value={contentFilter} onValueChange={(value: any) => setContentFilter(value)}>
-               <Select.Trigger className="flex items-center gap-2 px-3 py-1.5 text-xs border border-border rounded-md hover:bg-secondary transition-colors">
-                 <Filter className="w-3 h-3" />
-                 <Select.Value />
-                 <ChevronDown className="w-3 h-3 ml-1" />
-               </Select.Trigger>
-               <Select.Portal>
-                 <Select.Content className="bg-background border border-border rounded-md shadow-lg overflow-hidden z-50">
-                   <Select.Viewport>
-                     <Select.Item value="all" className="px-3 py-2 text-xs hover:bg-secondary cursor-pointer outline-none">
-                       <Select.ItemText>All</Select.ItemText>
-                     </Select.Item>
-                     <Select.Item value="text" className="px-3 py-2 text-xs hover:bg-secondary cursor-pointer outline-none">
-                       <Select.ItemText>Text</Select.ItemText>
-                     </Select.Item>
-                     <Select.Item value="table" className="px-3 py-2 text-xs hover:bg-secondary cursor-pointer outline-none">
-                       <Select.ItemText>Table</Select.ItemText>
-                     </Select.Item>
-                     <Select.Item value="image" className="px-3 py-2 text-xs hover:bg-secondary cursor-pointer outline-none">
-                       <Select.ItemText>Image</Select.ItemText>
-                     </Select.Item>
-                   </Select.Viewport>
-                 </Select.Content>
-               </Select.Portal>
-             </Select.Root>
           </div>
           <div className="p-6">
-            <JsonAccordion data={getFilteredData()} filter={contentFilter} />
+            {documentData ? (
+              <JsonAccordion node={documentData.root} depth={0} title="Document Root" />
+            ) : (
+              <div className="text-muted-foreground text-sm animate-pulse">Loading document structure...</div>
+            )}
           </div>
         </div>
 
@@ -427,7 +254,7 @@ export default function ViewPage() {
   )
 }
 
-function JsonAccordion({ data, depth = 0, filter }: { data: Record<string, DocumentNode>; depth?: number; filter: 'all' | ContentType }) {
+function JsonAccordion({ node, depth = 0, title }: { node: DocumentNode; depth?: number; title: string }) {
   // Define color schemes for each level (up to 5 levels)
   const levelColors = [
     { 
@@ -469,7 +296,7 @@ function JsonAccordion({ data, depth = 0, filter }: { data: Record<string, Docum
 
   const colors = levelColors[depth % levelColors.length]
 
-  const getTagStyles = (type?: ContentType) => {
+  const getTagStyles = (type: ContentType) => {
     switch (type) {
       case 'text':
         return 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30'
@@ -482,58 +309,92 @@ function JsonAccordion({ data, depth = 0, filter }: { data: Record<string, Docum
     }
   }
 
+  const hasChildren = node.children && node.children.length > 0
+  const hasContent = node.content && node.content.length > 0
+
   return (
     <div className={depth > 0 ? 'ml-4 pl-4 border-l border-border/50 mt-2' : ''}>
-      {Object.entries(data).map(([key, value]: [string, DocumentNode]) => {
-        const isVisible = filter === 'all' || value.contentType === filter || 
-                         Object.values(value.children).some(child => nodeMatchesFilter(child, filter))
-        
-        if (!isVisible) return null
-
-        const hasChildren = value.children && Object.keys(value.children).length > 0
-        const hasContent = value.content && value.content.length > 0
-
-        return (
-          <Accordion.Root key={key} type="single" collapsible className="mb-2">
-            <Accordion.Item value={key} className={`border ${colors.border} rounded-lg ${colors.bg} overflow-hidden transition-all`}>
-              <Accordion.Header>
-                <Accordion.Trigger className={`flex items-center justify-between w-full px-4 py-3 text-left ${colors.hover} transition-colors group`}>
-                  <div className="flex items-center gap-2 flex-1">
-                    <div className={`w-2 h-2 rounded-full ${colors.dot} transition-transform group-data-[state=open]:scale-125`}></div>
-                    <span className={`font-mono text-sm font-medium text-foreground ${colors.text} transition-colors`}>
-                      {key}
-                    </span>
-                    {value.contentType && (
-                      <span className={`ml-2 px-2 py-0.5 text-[10px] font-medium rounded-full border ${getTagStyles(value.contentType)}`}>
-                        {value.contentType.toUpperCase()}
+      <Accordion.Root type="single" collapsible className="mb-2">
+        <Accordion.Item value={title} className={`border ${colors.border} rounded-lg ${colors.bg} overflow-hidden transition-all`}>
+          <Accordion.Header>
+            <Accordion.Trigger className={`flex items-center justify-between w-full px-4 py-3 text-left ${colors.hover} transition-colors group`}>
+              <div className="flex items-center gap-2 flex-1">
+                <div className={`w-2 h-2 rounded-full ${colors.dot} transition-transform group-data-[state=open]:scale-125`}></div>
+                <span className={`font-mono text-sm font-medium text-foreground ${colors.text} transition-colors`}>
+                  {title}
+                </span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 flex-shrink-0" />
+            </Accordion.Trigger>
+          </Accordion.Header>
+          <Accordion.Content className="px-4 pb-4 pt-2 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
+            {hasContent && (
+              <div className="space-y-3 mb-4">
+                {node.content.map((item: ContentItem, idx: number) => (
+                  <div 
+                    key={idx} 
+                    className={`p-3 rounded-md border ${colors.border} ${colors.bg} bg-opacity-50 overflow-hidden min-w-0`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full border ${getTagStyles(item.type)}`}>
+                        {item.type.toUpperCase()}
                       </span>
-                    )}
+                    </div>
+                    <div className="markdown-content-box overflow-x-auto overflow-y-hidden">
+                      <div className="prose prose-sm max-w-full dark:prose-invert prose-p:m-0 prose-headings:m-0 prose-ul:m-0 prose-ol:m-0 prose-li:m-0 prose-blockquote:m-0 prose-pre:m-0">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                          p: ({ children }) => <p className="mb-2 last:mb-0 word-break break-words">{children}</p>,
+                          ul: ({ children }) => <ul className="mb-2 last:mb-0 pl-4 word-break break-words">{children}</ul>,
+                          ol: ({ children }) => <ol className="mb-2 last:mb-0 pl-4 word-break break-words">{children}</ol>,
+                          blockquote: ({ children }) => <blockquote className="mb-2 last:mb-0 border-l-4 border-muted-foreground/20 pl-4 italic word-break break-words">{children}</blockquote>,
+                          code: ({ children, className, ...props }) => {
+                            const isInline = !className?.includes('language-')
+                            return isInline ? (
+                              <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono word-break break-all" {...props}>
+                                {children}
+                              </code>
+                            ) : (
+                              <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto my-2">
+                                <code className="word-break break-all" {...props}>
+                                  {children}
+                                </code>
+                              </pre>
+                            )
+                          },
+                          table: ({ children }) => <div className="overflow-x-auto my-2"><table className="min-w-full">{children}</table></div>,
+                          th: ({ children }) => <th className="border px-2 py-1 text-left font-semibold bg-muted/50">{children}</th>,
+                          td: ({ children }) => <td className="border px-2 py-1 word-break break-words">{children}</td>,
+                        }}
+                        >
+                          {item.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 flex-shrink-0" />
-                </Accordion.Trigger>
-              </Accordion.Header>
-              <Accordion.Content className="px-4 pb-4 pt-2 data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
-                {hasContent && (
-                  <div className="space-y-2 mb-4 pl-4">
-                    {value.content.map((line: string, idx: number) => (
-                      <p key={idx} className="text-sm text-muted-foreground leading-relaxed font-mono">
-                        "{line}"
-                      </p>
-                    ))}
-                  </div>
-                )}
-                {hasChildren && <JsonAccordion data={value.children} depth={depth + 1} filter={filter} />}
-              </Accordion.Content>
-            </Accordion.Item>
-          </Accordion.Root>
-        )
-      })}
+                ))}
+              </div>
+            )}
+            {hasChildren && (
+              <div className="space-y-2">
+                {node.children.map((childObj: Record<string, DocumentNode>, idx: number) => {
+                  const childKey = Object.keys(childObj)[0]
+                  const childNode = childObj[childKey]
+                  return (
+                    <JsonAccordion 
+                      key={idx} 
+                      node={childNode} 
+                      depth={depth + 1} 
+                      title={childKey}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </Accordion.Content>
+        </Accordion.Item>
+      </Accordion.Root>
     </div>
   )
-}
-
-function nodeMatchesFilter(node: DocumentNode, filter: 'all' | ContentType): boolean {
-  if (filter === 'all') return true
-  if (node.contentType === filter) return true
-  return Object.values(node.children).some(child => nodeMatchesFilter(child, filter))
 }
