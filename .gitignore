@@ -4,3 +4,6 @@ package-lock.json
 out/
 dist/
 .build/
+.env
+*.log
+.DS_Store
