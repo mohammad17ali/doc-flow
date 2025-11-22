@@ -265,7 +265,7 @@ export default function ViewPage() {
                 </Link>
               </div>
             ) : documentData ? (
-              <JsonAccordion node={documentData.root} depth={0} title="Document Root" filter={contentFilter} />
+              <JsonAccordion node={documentData.root} depth={0} title="Document Root" filter={contentFilter} isRoot={true} />
             ) : (
               <div className="text-muted-foreground text-sm">No document data available</div>
             )}
@@ -360,7 +360,7 @@ function nodeHasMatchingContent(node: DocumentNode, filter: 'all' | 'text' | 'ta
   return false
 }
 
-function JsonAccordion({ node, depth = 0, title, filter = 'all' }: { node: DocumentNode; depth?: number; title: string; filter?: 'all' | 'text' | 'table' }) {
+function JsonAccordion({ node, depth = 0, title, filter = 'all', isRoot = false }: { node: DocumentNode; depth?: number; title: string; filter?: 'all' | 'text' | 'table'; isRoot?: boolean }) {
   // Define color schemes for each level (up to 5 levels)
   const levelColors = [
     { 
@@ -438,8 +438,8 @@ function JsonAccordion({ node, depth = 0, title, filter = 'all' }: { node: Docum
   const hasChildren = node.children && node.children.length > 0
 
   return (
-    <div className={depth > 0 ? 'ml-4 pl-4 border-l border-border/50 mt-2' : ''}>
-      <Accordion.Root type="single" collapsible className="mb-2">
+    <div className={depth > 0 ? 'ml-2 pl-1 border-l border-border/50 mt-2' : ''}>
+      <Accordion.Root type="single" collapsible className="mb-2" defaultValue={isRoot ? title : undefined}>
         <Accordion.Item value={title} className={`border ${colors.border} rounded-lg ${colors.bg} overflow-hidden transition-all`}>
           <Accordion.Header>
             <Accordion.Trigger className={`flex items-center justify-between w-full px-4 py-3 text-left ${colors.hover} transition-colors group`}>
