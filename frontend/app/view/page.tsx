@@ -312,6 +312,80 @@ export default function ViewPage() {
                   </div>
                 )}
               </div>
+            ) : contentFilter === 'table' && documentData ? (
+              // Show flattened tables when table filter is selected
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold text-foreground mb-4">Document Tables</h2>
+                {(() => {
+                  const flattenedTables = flattenTablesFromNode(documentData.root, 'Document', 'table')
+                  return flattenedTables.length > 0 ? (
+                    <div className="space-y-3">
+                      {flattenedTables.map((item, idx) => (
+                        <div key={idx} className="border border-emerald-500/30 dark:border-emerald-500/40 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 overflow-hidden">
+                          <div className="px-4 py-3 bg-emerald-500/5 border-b border-emerald-500/20">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                              <span className="font-mono text-sm font-medium text-foreground">
+                                {item.path}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="p-4 space-y-3">
+                            {item.content.map((contentItem: ContentItem, contentIdx: number) => (
+                              <div 
+                                key={contentIdx} 
+                                className="p-3 rounded-md border border-emerald-500/30 dark:border-emerald-500/40 bg-emerald-500/10 dark:bg-emerald-500/20 bg-opacity-50 overflow-hidden min-w-0"
+                              >
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="px-2 py-0.5 text-[10px] font-medium rounded-full border bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                                    TABLE
+                                  </span>
+                                </div>
+                                <div className="markdown-content-box overflow-x-auto overflow-y-hidden">
+                                  <div className="prose prose-sm max-w-full dark:prose-invert prose-p:m-0 prose-headings:m-0 prose-ul:m-0 prose-ol:m-0 prose-li:m-0 prose-blockquote:m-0 prose-pre:m-0">
+                                    <ReactMarkdown
+                                      remarkPlugins={[remarkGfm]}
+                                      components={{
+                                        p: ({ children }) => <p className="mb-2 last:mb-0 word-break break-words">{children}</p>,
+                                        ul: ({ children }) => <ul className="mb-2 last:mb-0 pl-4 word-break break-words">{children}</ul>,
+                                        ol: ({ children }) => <ol className="mb-2 last:mb-0 pl-4 word-break break-words">{children}</ol>,
+                                        blockquote: ({ children }) => <blockquote className="mb-2 last:mb-0 border-l-4 border-muted-foreground/20 pl-4 italic word-break break-words">{children}</blockquote>,
+                                        code: ({ children, className, ...props }) => {
+                                          const isInline = !className?.includes('language-')
+                                          return isInline ? (
+                                            <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono word-break break-all" {...props}>
+                                              {children}
+                                            </code>
+                                          ) : (
+                                            <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto my-2">
+                                              <code className="word-break break-all" {...props}>
+                                                {children}
+                                              </code>
+                                            </pre>
+                                          )
+                                        },
+                                        table: ({ children }) => <div className="overflow-x-auto my-2"><table className="min-w-full">{children}</table></div>,
+                                        th: ({ children }) => <th className="border px-2 py-1 text-left font-semibold bg-muted/50">{children}</th>,
+                                        td: ({ children }) => <td className="border px-2 py-1 word-break break-words">{children}</td>,
+                                      }}
+                                    >
+                                      {contentItem.content}
+                                    </ReactMarkdown>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground text-sm text-center py-12">
+                      No tables found in this document
+                    </div>
+                  )
+                })()}
+              </div>
             ) : documentData ? (
               <JsonAccordion node={documentData.root} depth={0} title="Document Root" filter={contentFilter} isRoot={true} />
             ) : (
@@ -384,6 +458,39 @@ export default function ViewPage() {
       </div>
     </div>
   )
+}
+
+// Helper function to flatten tables from the document structure
+interface FlattenedTable {
+  path: string
+  content: ContentItem[]
+}
+
+function flattenTablesFromNode(node: DocumentNode, currentPath: string = 'Document', filter: 'table'): FlattenedTable[] {
+  const results: FlattenedTable[] = []
+  
+  // Check if this node has tables
+  if (node.content && node.content.length > 0) {
+    const tables = node.content.filter((item: ContentItem) => item.type === filter)
+    if (tables.length > 0) {
+      results.push({
+        path: currentPath,
+        content: tables
+      })
+    }
+  }
+  
+  // Recursively check children
+  if (node.children && node.children.length > 0) {
+    node.children.forEach((childObj: Record<string, DocumentNode>) => {
+      const childKey = Object.keys(childObj)[0]
+      const childNode = childObj[childKey]
+      const childPath = `${currentPath}/${childKey}`
+      results.push(...flattenTablesFromNode(childNode, childPath, filter))
+    })
+  }
+  
+  return results
 }
 
 // Helper function to check if a node or its children have matching content
