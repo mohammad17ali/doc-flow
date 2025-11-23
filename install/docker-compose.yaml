@@ -16,7 +16,7 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - PDF_RESULTS_DIR=/pdf-results
     volumes:
-      - ${HOME}/pdf-results:/pdf-results:ro
+      - /home/intel/pdf-results:/pdf-results:ro
     networks:
       - doc-flow-network
     restart: unless-stopped
