@@ -48,7 +48,7 @@ export const getDocumentImages = async (id: string): Promise<string[]> => {
  */
 export const getImageUrl = (documentId: string, imageName: string): string => {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-  return `${baseUrl}/api/documents/${documentId}/images/${imageName}`;
+  return `${baseUrl}/images/${documentId}/${imageName}`;
 };
 
 export default apiClient;
