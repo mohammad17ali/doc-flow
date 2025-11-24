@@ -1,8 +1,15 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import documentRoutes from './routes/documentRoutes';
+import authRoutes from './routes/authRoutes';
+import adminRoutes from './routes/adminRoutes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { OUTPUTS_DIR } from './config/paths';
+import { connectToDatabase } from './config/database';
+import { UserModel } from './models/User';
+import { UserGroupModel } from './models/UserGroup';
+import { SessionModel } from './models/Session';
+import { DocumentModel } from './models/Document';
 
 const app: Application = express();
 const PORT = process.env.PORT || 5002;
@@ -34,19 +41,44 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/documents', documentRoutes);
 
 // Error handling
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  console.log('='.repeat(50));
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📝 API: http://localhost:${PORT}/api`);
-  console.log(`💚 Health: http://localhost:${PORT}/health`);
-  console.log('='.repeat(50));
-});
+// Initialize database and start server
+async function startServer() {
+  try {
+    // Connect to MongoDB
+    await connectToDatabase();
+    
+    // Create database indexes
+    await UserModel.createIndexes();
+    await UserGroupModel.createIndexes();
+    await SessionModel.createIndexes();
+    await DocumentModel.createIndexes();
+    
+    console.log('✅ Database indexes created');
+
+    // Start server
+    app.listen(PORT, () => {
+      console.log('='.repeat(50));
+      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`📝 API: http://localhost:${PORT}/api`);
+      console.log(`🔐 Auth: http://localhost:${PORT}/api/auth`);
+      console.log(`👤 Admin: http://localhost:${PORT}/api/admin`);
+      console.log(`💚 Health: http://localhost:${PORT}/health`);
+      console.log('='.repeat(50));
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 export default app;

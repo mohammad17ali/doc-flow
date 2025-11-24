@@ -1,7 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { ObjectId } from 'mongodb';
 import { OUTPUTS_DIR, OUTPUT_TREE_FILENAME } from '../config/paths';
 import { DocumentMetadata, DocumentStructure } from '../types/document';
+import { DocumentModel } from '../models/Document';
 
 /**
  * Service for handling document operations
@@ -9,15 +11,20 @@ import { DocumentMetadata, DocumentStructure } from '../types/document';
 export class DocumentService {
   /**
    * Get all available documents from the outputs directory
+   * Filtered by user's group permissions
    */
-  async getAllDocuments(): Promise<DocumentMetadata[]> {
+  async getAllDocuments(userGroupIds: ObjectId[]): Promise<DocumentMetadata[]> {
     try {
+      // Get documents user has access to from database
+      const accessibleDocs = await DocumentModel.findByGroupIds(userGroupIds);
+      const accessibleDocIds = new Set(accessibleDocs.map(doc => doc.documentId));
+      
       const entries = await fs.readdir(OUTPUTS_DIR, { withFileTypes: true });
       
       const documents: DocumentMetadata[] = [];
       
       for (const entry of entries) {
-        if (entry.isDirectory()) {
+        if (entry.isDirectory() && accessibleDocIds.has(entry.name)) {
           const docPath = path.join(OUTPUTS_DIR, entry.name);
           const outputTreePath = path.join(docPath, OUTPUT_TREE_FILENAME);
           
@@ -48,10 +55,24 @@ export class DocumentService {
   }
 
   /**
-   * Get a specific document's output_tree.json
+   * Check if user has access to a document
    */
-  async getDocumentById(documentId: string): Promise<DocumentStructure> {
+  async checkAccess(documentId: string, userGroupIds: ObjectId[]): Promise<boolean> {
+    return await DocumentModel.hasAccess(documentId, userGroupIds);
+  }
+
+  /**
+   * Get a specific document's output_tree.json
+   * Requires user to have permission
+   */
+  async getDocumentById(documentId: string, userGroupIds: ObjectId[]): Promise<DocumentStructure> {
     try {
+      // Check permissions first
+      const hasAccess = await this.checkAccess(documentId, userGroupIds);
+      if (!hasAccess) {
+        throw new Error('Access denied: You do not have permission to view this document');
+      }
+
       const outputTreePath = path.join(OUTPUTS_DIR, documentId, OUTPUT_TREE_FILENAME);
       
       // Check if the file exists
@@ -90,9 +111,16 @@ export class DocumentService {
 
   /**
    * Get all images for a specific document
+   * Requires user to have permission
    */
-  async getDocumentImages(documentId: string): Promise<string[]> {
+  async getDocumentImages(documentId: string, userGroupIds: ObjectId[]): Promise<string[]> {
     try {
+      // Check permissions first
+      const hasAccess = await this.checkAccess(documentId, userGroupIds);
+      if (!hasAccess) {
+        throw new Error('Access denied: You do not have permission to view this document');
+      }
+
       const docPath = path.join(OUTPUTS_DIR, documentId);
       
       // Check if the directory exists
