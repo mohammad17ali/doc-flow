@@ -82,12 +82,12 @@ docker build \
   -t doc-flow-frontend:latest .
 ```
 
-**With proxy (if needed):**
+**With proxy (if needed behind corporate proxy):**
 ```bash
 docker build \
-    --build-arg no_proxy=$no_proxy \
   --build-arg http_proxy=$http_proxy \
   --build-arg https_proxy=$https_proxy \
+  --build-arg no_proxy=$no_proxy \
   --build-arg NEXT_PUBLIC_API_URL=http://10.138.190.67:5001 \
   -t doc-flow-frontend:latest .
 ```
