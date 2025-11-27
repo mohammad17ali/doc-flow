@@ -90,6 +90,7 @@ export class AuthService {
         userId: user._id!.toString(),
         username: user.username,
         email: user.email,
+        fullName: user.fullName,
         groups: groups.map(g => g.name),
         groupIds: groups.map(g => g._id!.toString()),
       },
@@ -135,6 +136,7 @@ export class AuthService {
       userId: user._id!.toString(),
       username: user.username,
       email: user.email,
+      fullName: user.fullName,
       groups: groups.map(g => g.name),
       groupIds: groups.map(g => g._id!.toString()),
     };

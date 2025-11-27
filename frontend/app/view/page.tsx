@@ -27,11 +27,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Document, Page, pdfjs } from 'react-pdf'
 import * as Accordion from '@radix-ui/react-accordion'
-import { ModeToggle } from '@/components/mode-toggle'
+import { UserMenu } from '@/components/UserMenu'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { getDocumentById, getDocumentImages, getImageUrl } from '@/lib/api'
 import { DocumentStructure } from '@/types/document'
+import ProtectedRoute from '@/components/ProtectedRoute'
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
@@ -49,6 +50,14 @@ interface DocumentNode {
 }
 
 export default function ViewPage() {
+  return (
+    <ProtectedRoute>
+      <ViewContent />
+    </ProtectedRoute>
+  );
+}
+
+function ViewContent() {
   const searchParams = useSearchParams()
   const documentId = searchParams.get('id')
   
@@ -97,7 +106,7 @@ export default function ViewPage() {
         setError(null)
       } catch (err) {
         console.error('Failed to load document structure:', err)
-        setError('Failed to load document. Please ensure the backend server is running.')
+        setError('Failed to load document. You may not have permission to view this document.')
       } finally {
         setLoading(false)
       }
@@ -222,7 +231,6 @@ export default function ViewPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-           <ModeToggle />
            <Button 
              onClick={handleExport}
              variant="outline" 
@@ -232,6 +240,7 @@ export default function ViewPage() {
              <Download className="w-3 h-3 mr-1.5" />
              Export JSON
            </Button>
+           <UserMenu />
         </div>
       </header>
 

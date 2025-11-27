@@ -7,15 +7,26 @@ import { Search, Filter, FileText, ChevronDown, ChevronRight, Menu, X, Layers } 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ModeToggle } from '@/components/mode-toggle'
+import { UserMenu } from '@/components/UserMenu'
 import { getAllDocuments } from '@/lib/api'
 import { DocumentMetadata } from '@/types/document'
+import { useAuth } from '@/contexts/AuthContext'
+import ProtectedRoute from '@/components/ProtectedRoute'
 
 const filterCategories = {
   tags: ['Engineering', 'Research', 'AI', 'Product', 'Planning', 'Design', 'Business', 'UX'],
 }
 
 export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
+  );
+}
+
+function DashboardContent() {
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
@@ -28,6 +39,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const isAdmin = user?.groups?.some(g => g.toLowerCase() === 'admin') || false;
+
   // Fetch documents from the backend
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -38,7 +51,7 @@ export default function DashboardPage() {
         setError(null)
       } catch (err) {
         console.error('Failed to fetch documents:', err)
-        setError('Failed to load documents. Please ensure the backend server is running.')
+        setError('Failed to load documents. Please ensure you have proper permissions.')
       } finally {
         setLoading(false)
       }
@@ -105,8 +118,7 @@ export default function DashboardPage() {
                 className="pl-10 bg-secondary border-border focus-visible:ring-primary"
               />
             </div>
-            {/* Added ModeToggle component to the header */}
-            <ModeToggle />
+            <UserMenu />
           </div>
         </div>
       </header>
@@ -176,14 +188,23 @@ export default function DashboardPage() {
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-12 gap-4">
-                <div className="text-destructive text-sm">{error}</div>
-                <Button 
-                  onClick={() => window.location.reload()} 
-                  variant="outline"
-                  size="sm"
-                >
-                  Retry
-                </Button>
+                <div className="text-destructive text-sm text-center">{error}</div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => window.location.reload()} 
+                    variant="outline"
+                    size="sm"
+                  >
+                    Retry
+                  </Button>
+                  {isAdmin && (
+                    <Link href="/admin">
+                      <Button variant="outline" size="sm">
+                        Manage Permissions
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
             ) : filteredDocuments.length === 0 ? (
               <div className="flex items-center justify-center py-12">

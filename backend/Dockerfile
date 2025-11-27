@@ -21,6 +21,9 @@ RUN npm run build
 # Production stage
 FROM node:20-alpine
 
+# Install netcat for MongoDB health check
+RUN apk add --no-cache netcat-openbsd
+
 WORKDIR /app
 
 # Copy package files
@@ -32,6 +35,10 @@ RUN npm ci --omit=dev
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy initialization script
+COPY init.sh ./
+RUN chmod +x init.sh
+
 # Expose port
 EXPOSE 5001
 
@@ -39,5 +46,5 @@ EXPOSE 5001
 ENV NODE_ENV=production
 ENV PORT=5001
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application using the init script
+CMD ["./init.sh"]

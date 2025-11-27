@@ -49,6 +49,7 @@ export class UserManagementService {
     const userId = await UserModel.create({
       username: request.username,
       email: request.email,
+      fullName: request.fullName,
       passwordHash,
       groupIds,
       isActive: true,
@@ -67,6 +68,7 @@ export class UserManagementService {
     userId: string,
     updates: {
       email?: string;
+      fullName?: string;
       password?: string;
       groupIds?: string[];
       isActive?: boolean;
@@ -87,6 +89,11 @@ export class UserManagementService {
         throw new Error('Email already exists');
       }
       updateData.email = updates.email;
+    }
+
+    // Update fullName if provided
+    if (updates.fullName !== undefined) {
+      updateData.fullName = updates.fullName;
     }
 
     // Update password if provided
@@ -134,27 +141,45 @@ export class UserManagementService {
   /**
    * Get user by ID
    */
-  static async getUser(userId: string): Promise<Omit<User, 'passwordHash'> | null> {
+  static async getUser(userId: string): Promise<any | null> {
     const user = await UserModel.findById(new ObjectId(userId));
     
     if (!user) {
       return null;
     }
 
-    // Remove password hash from response
-    const { passwordHash, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    // Get groups to populate group names
+    const groups = await UserGroupModel.findByIds(user.groupIds);
+    const groupMap = new Map(groups.map(g => [g._id!.toString(), g.name]));
+
+    // Remove password hash and add group names to response
+    const { passwordHash, _id, groupIds, ...userWithoutPassword } = user;
+    return {
+      ...userWithoutPassword,
+      userId: _id!.toString(),
+      groupIds: groupIds.map(id => id.toString()),
+      groups: groupIds.map(id => groupMap.get(id.toString()) || id.toString()),
+    };
   }
 
   /**
    * List all users
    */
-  static async listUsers(activeOnly: boolean = false): Promise<Omit<User, 'passwordHash'>[]> {
+  static async listUsers(activeOnly: boolean = false): Promise<any[]> {
     const filter = activeOnly ? { isActive: true } : {};
     const users = await UserModel.findAll(filter);
     
-    // Remove password hashes from response
-    return users.map(({ passwordHash, ...user }) => user);
+    // Get all groups to populate group names
+    const allGroups = await UserGroupModel.findAll();
+    const groupMap = new Map(allGroups.map(g => [g._id!.toString(), g.name]));
+    
+    // Remove password hashes and add group names to response
+    return users.map(({ passwordHash, _id, groupIds, ...user }) => ({
+      ...user,
+      userId: _id!.toString(),
+      groupIds: groupIds.map(id => id.toString()),
+      groups: groupIds.map(id => groupMap.get(id.toString()) || id.toString()),
+    }));
   }
 
   /**

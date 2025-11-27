@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { FileText, ArrowRight, Layers, FileJson, Terminal, Cpu, Database, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ModeToggle } from '@/components/mode-toggle'
 
 export default function LandingPage() {
   return (
@@ -19,7 +18,11 @@ export default function LandingPage() {
             <h1 className="text-lg font-bold tracking-tight">DocuStructure</h1>
           </div>
           <div className="flex items-center gap-4">
-            <ModeToggle />
+            <Link href="/login">
+              <Button variant="outline" size="sm">
+                Login
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
@@ -36,13 +39,6 @@ export default function LandingPage() {
             transition={{ duration: 0.6 }}
             className="max-w-4xl mx-auto text-center"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary border border-border mb-8">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">v2.0 is now available</span>
-            </div>
             
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-8 text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/50">
               The intelligent way to <br /> parse documents.
@@ -58,11 +54,6 @@ export default function LandingPage() {
                 <Button size="lg" className="h-12 px-8 text-base bg-foreground text-background hover:bg-foreground/90">
                   Start Building
                   <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
-              </Link>
-              <Link href="/view">
-                <Button size="lg" variant="outline" className="h-12 px-8 text-base border-border hover:bg-secondary">
-                  View Demo
                 </Button>
               </Link>
             </div>

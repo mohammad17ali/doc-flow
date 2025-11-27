@@ -9,7 +9,9 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "init-admin": "ts-node-dev src/scripts/initAdmin.ts",
-    "init-docs": "ts-node-dev src/scripts/initDocumentPermissions.ts"
+    "init-admin:prod": "node dist/scripts/initAdmin.js",
+    "init-docs": "ts-node-dev src/scripts/initDocumentPermissions.ts",
+    "init-docs:prod": "node dist/scripts/initDocumentPermissions.js"
   },
   "keywords": [],
   "author": "",

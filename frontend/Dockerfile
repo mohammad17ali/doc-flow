@@ -8,10 +8,16 @@ ARG http_proxy
 ARG https_proxy
 ARG no_proxy
 
+# Accept API URL as build argument
+ARG NEXT_PUBLIC_API_URL=http://localhost:5001
+
 # Set proxy environment variables if provided
 ENV http_proxy=${http_proxy}
 ENV https_proxy=${https_proxy}
 ENV no_proxy=${no_proxy}
+
+# Set Next.js public environment variable for build time
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 WORKDIR /app
 
@@ -24,7 +30,7 @@ RUN npm ci
 # Copy the rest of the application
 COPY . .
 
-# Build the Next.js app
+# Build the Next.js app with the API URL baked in
 RUN npm run build
 
 # -----------------------------

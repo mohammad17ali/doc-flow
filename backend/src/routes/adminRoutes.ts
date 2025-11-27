@@ -178,6 +178,60 @@ router.delete('/users/:userId', async (req: Request, res: Response): Promise<voi
 });
 
 /**
+ * POST /api/admin/users/bulk-delete
+ * Delete multiple users
+ */
+router.post('/users/bulk-delete', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'userIds must be a non-empty array',
+      });
+      return;
+    }
+
+    // Filter out current user
+    const filteredUserIds = userIds.filter(id => id !== req.user?.userId);
+    
+    if (filteredUserIds.length < userIds.length) {
+      console.warn('Attempted to delete own account in bulk delete');
+    }
+
+    let deletedCount = 0;
+    const errors = [];
+
+    for (const userId of filteredUserIds) {
+      try {
+        const success = await UserManagementService.deleteUser(userId);
+        if (success) {
+          deletedCount++;
+        }
+      } catch (error: any) {
+        errors.push({ userId, error: error.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Deleted ${deletedCount} user(s)`,
+      data: {
+        deletedCount,
+        errors: errors.length > 0 ? errors : undefined,
+      },
+    });
+  } catch (error: any) {
+    console.error('Bulk delete users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete users',
+    });
+  }
+});
+
+/**
  * POST /api/admin/users/:userId/groups/:groupId
  * Add user to group
  */
@@ -377,6 +431,53 @@ router.delete('/groups/:groupId', async (req: Request, res: Response): Promise<v
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to delete group',
+    });
+  }
+});
+
+/**
+ * POST /api/admin/groups/bulk-delete
+ * Delete multiple user groups
+ */
+router.post('/groups/bulk-delete', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { groupIds } = req.body;
+
+    if (!Array.isArray(groupIds) || groupIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'groupIds must be a non-empty array',
+      });
+      return;
+    }
+
+    let deletedCount = 0;
+    const errors = [];
+
+    for (const groupId of groupIds) {
+      try {
+        const success = await UserManagementService.deleteUserGroup(groupId);
+        if (success) {
+          deletedCount++;
+        }
+      } catch (error: any) {
+        errors.push({ groupId, error: error.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Deleted ${deletedCount} group(s)`,
+      data: {
+        deletedCount,
+        errors: errors.length > 0 ? errors : undefined,
+      },
+    });
+  } catch (error: any) {
+    console.error('Bulk delete groups error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete groups',
     });
   }
 });
@@ -607,6 +708,53 @@ router.delete('/documents/:documentId', async (req: Request, res: Response): Pro
     res.status(500).json({
       success: false,
       message: 'Failed to delete document',
+    });
+  }
+});
+
+/**
+ * POST /api/admin/documents/bulk-delete
+ * Delete multiple documents
+ */
+router.post('/documents/bulk-delete', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { documentIds } = req.body;
+
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'documentIds must be a non-empty array',
+      });
+      return;
+    }
+
+    let deletedCount = 0;
+    const errors = [];
+
+    for (const documentId of documentIds) {
+      try {
+        const success = await DocumentModel.delete(documentId);
+        if (success) {
+          deletedCount++;
+        }
+      } catch (error: any) {
+        errors.push({ documentId, error: error.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Deleted ${deletedCount} document(s)`,
+      data: {
+        deletedCount,
+        errors: errors.length > 0 ? errors : undefined,
+      },
+    });
+  } catch (error: any) {
+    console.error('Bulk delete documents error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete documents',
     });
   }
 });

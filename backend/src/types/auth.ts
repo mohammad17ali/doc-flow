@@ -4,6 +4,7 @@ export interface User {
   _id?: ObjectId;
   username: string;
   email: string;
+  fullName?: string;
   passwordHash: string;
   groupIds: ObjectId[];
   isActive: boolean;
@@ -36,6 +37,7 @@ export interface Session {
 export interface CreateUserRequest {
   username: string;
   email: string;
+  fullName?: string;
   password: string;
   groupIds?: string[];
 }
@@ -54,6 +56,7 @@ export interface AuthenticatedUser {
   userId: string;
   username: string;
   email: string;
+  fullName?: string;
   groups: string[]; // Group names for display/checking
   groupIds: string[]; // Group ObjectId strings for permission queries
 }
