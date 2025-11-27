@@ -4,7 +4,7 @@ import documentRoutes from './routes/documentRoutes';
 import authRoutes from './routes/authRoutes';
 import adminRoutes from './routes/adminRoutes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
-import { OUTPUTS_DIR } from './config/paths';
+import { OUTPUTS_DIR, PDFS_DIR } from './config/paths';
 import { connectToDatabase } from './config/database';
 import { UserModel } from './models/User';
 import { UserGroupModel } from './models/UserGroup';
@@ -24,6 +24,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve images as static files
 app.use('/images', express.static(OUTPUTS_DIR));
+
+// Serve PDFs as static files
+app.use('/pdfs', express.static(PDFS_DIR));
 
 // Request logging
 app.use((req, res, next) => {
