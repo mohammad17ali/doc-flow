@@ -1,19 +1,7 @@
 'use client'
 
-// Apply polyfill BEFORE any imports
-if (typeof Promise !== 'undefined' && !(Promise as any).withResolvers) {
-  (Promise as any).withResolvers = function <T>() {
-    let resolve: (value: T | PromiseLike<T>) => void;
-    let reject: (reason?: any) => void;
-    const promise = new Promise<T>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    return { promise, resolve: resolve!, reject: reject! };
-  };
-}
-
 import { useState, useRef, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Layers, ChevronDown, Download, GripVertical, Filter } from 'lucide-react'
@@ -25,17 +13,43 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Document, Page, pdfjs } from 'react-pdf'
 import * as Accordion from '@radix-ui/react-accordion'
 import { UserMenu } from '@/components/UserMenu'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { getDocumentById, getDocumentImages, getImageUrl } from '@/lib/api'
+import { getDocumentById, getDocumentImages, getImageUrl, getPdfUrl } from '@/lib/api'
 import { DocumentStructure } from '@/types/document'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+// Apply polyfill for Promise.withResolvers in browser only
+if (typeof window !== 'undefined' && typeof Promise !== 'undefined' && !(Promise as any).withResolvers) {
+  (Promise as any).withResolvers = function <T>() {
+    let resolve: (value: T | PromiseLike<T>) => void;
+    let reject: (reason?: any) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve: resolve!, reject: reject! };
+  };
+}
+
+// Dynamically import react-pdf components (client-side only)
+const Document = dynamic(
+  () => import('react-pdf').then((mod) => mod.Document),
+  { ssr: false }
+)
+const Page = dynamic(
+  () => import('react-pdf').then((mod) => mod.Page),
+  { ssr: false }
+)
+
+// Configure PDF.js worker (client-side only)
+if (typeof window !== 'undefined') {
+  import('react-pdf').then((pdfjs) => {
+    pdfjs.pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.pdfjs.version}/build/pdf.worker.min.mjs`;
+  });
+}
 
 type ContentType = 'text' | 'table' | 'image'
 
@@ -90,8 +104,8 @@ function ViewContent() {
         const data = await getDocumentById(documentId)
         setDocumentData(data)
         
-        // Set the PDF URL based on the document ID
-        setPdfUrl(`/pdfs/${documentId}.pdf`)
+        // Set the PDF URL from backend API
+        setPdfUrl(getPdfUrl(documentId))
         
         // Fetch images for this document
         try {
@@ -440,7 +454,7 @@ function ViewContent() {
                     <div className="flex flex-col items-center justify-center h-96 w-full gap-4">
                       <div className="text-destructive text-sm">Failed to load PDF</div>
                       <div className="text-muted-foreground text-xs">
-                        Make sure {documentId}.pdf exists in the public/pdfs folder
+                        Make sure {documentId}.pdf exists in the backend PDFs directory
                       </div>
                     </div>
                   }

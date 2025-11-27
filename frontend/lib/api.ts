@@ -84,8 +84,16 @@ export const getDocumentImages = async (id: string): Promise<string[]> => {
  * Get the URL for a specific image
  */
 export const getImageUrl = (documentId: string, imageName: string): string => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://g2-wyn04.iind.intel.com:5002';
   return `${baseUrl}/images/${documentId}/${imageName}`;
+};
+
+/**
+ * Get the URL for a specific PDF document
+ */
+export const getPdfUrl = (documentId: string): string => {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://g2-wyn04.iind.intel.com:5002';
+  return `${baseUrl}/pdfs/${documentId}.pdf`;
 };
 
 // ============ AUTHENTICATION APIs ============
