@@ -164,7 +164,7 @@ function ViewContent() {
             setPdfUrl('')
           }
         } else {
-          setPdfUrl(getPdfUrl(documentId))
+        setPdfUrl(getPdfUrl(documentId))
         }
         
         // Fetch images for this document - use different endpoints for batch files

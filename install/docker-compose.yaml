@@ -4,42 +4,63 @@ services:
   mongodb:
     image: mongo:7.0
     container_name: doc-flow-mongo
-    ports:
-      - "27017:27017"
+
     environment:
       - MONGO_INITDB_DATABASE=docflow
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-docflow_admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-changeme_secure_password}
     volumes:
       - mongodb-data:/data/db
     networks:
       - doc-flow-network
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "-u", "${MONGO_ROOT_USER:-docflow_admin}", "-p", "${MONGO_ROOT_PASSWORD:-changeme_secure_password}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
 
   backend:
-    image: doc-flow-backend:auth
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: doc-flow-backend:latest
     container_name: doc-flow-backend
     ports:
       - "5001:5001"
     environment:
       - NODE_ENV=production
       - PORT=5001
-      - FRONTEND_URL=http://g2-wyn04.iind.intel.com:3000
-      - PDF_RESULTS_DIR=/pdf-results
-      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_URI=mongodb://${MONGO_ROOT_USER:-docflow_admin}:${MONGO_ROOT_PASSWORD:-changeme_secure_password}@mongodb:27017
       - DB_NAME=docflow
+      - OUTPUTS_DIR=/data/outputs
+      - BATCH_OUTPUTS_DIR=/data/batch_processing
+      - PDFS_DIR=/data/pdfs
     volumes:
-      - /home/intel/pdf-results:/pdf-results:ro
+      - /home/ritik-intel/ali/pdf-parser/outputs:/data/outputs:ro
+      - /home/ritik-intel/ali/pdf-parser/batch_processing:/data/batch_processing:ro
+      - /home/ritik-intel/ali/pdf-parser/pdfs:/data/pdfs:ro
     networks:
       - doc-flow-network
     depends_on:
       mongodb:
         condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5001/health"]
       interval: 30s
@@ -47,13 +68,16 @@ services:
       retries: 3
       start_period: 40s
 
+  # ---------------------------------------------------------------------------
+  # Frontend Web UI
+  # ---------------------------------------------------------------------------
   frontend:
     build:
       context: ../frontend
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: http://g2-wyn04.iind.intel.com:5001
-    image: doc-flow-frontend:auth3
+    image: doc-flow-frontend:latest
     container_name: doc-flow-frontend
     ports:
       - "3000:3000"
@@ -66,6 +90,13 @@ services:
     networks:
       - doc-flow-network
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
 
 networks:
   doc-flow-network:
@@ -74,3 +105,4 @@ networks:
 volumes:
   mongodb-data:
     driver: local
+
