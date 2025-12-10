@@ -7,8 +7,9 @@ services:
 
     environment:
       - MONGO_INITDB_DATABASE=docflow
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-docflow_admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-changeme_secure_password}
+      # Uncomment below for MongoDB authentication (requires volume reset)
+      # - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-docflow_admin}
+      # - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-changeme_secure_password}
     volumes:
       - mongodb-data:/data/db
     networks:
@@ -22,11 +23,11 @@ services:
           memory: 1G
           cpus: '1.0'
     healthcheck:
-      test: ["CMD", "mongosh", "-u", "${MONGO_ROOT_USER:-docflow_admin}", "-p", "${MONGO_ROOT_PASSWORD:-changeme_secure_password}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
 
   backend:
     build:
@@ -39,7 +40,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5001
-      - MONGODB_URI=mongodb://${MONGO_ROOT_USER:-docflow_admin}:${MONGO_ROOT_PASSWORD:-changeme_secure_password}@mongodb:27017
+      - MONGODB_URI=mongodb://mongodb:27017
       - DB_NAME=docflow
       - OUTPUTS_DIR=/data/outputs
       - BATCH_OUTPUTS_DIR=/data/batch_processing
