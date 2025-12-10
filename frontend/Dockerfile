@@ -25,7 +25,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including dev)
-RUN npm ci
+# Use npm install if package-lock.json might be missing
+RUN npm install
 
 # Copy the rest of the application
 COPY . .
@@ -55,7 +56,7 @@ ENV no_proxy=${no_proxy}
 
 # Copy only necessary files
 COPY --from=builder /app/package*.json ./
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm install --omit=dev --ignore-scripts
 
 # Copy built Next.js output
 COPY --from=builder /app/.next ./.next
