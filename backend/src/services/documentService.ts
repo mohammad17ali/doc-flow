@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { ObjectId } from 'mongodb';
-import { OUTPUTS_DIR, OUTPUT_TREE_FILENAME } from '../config/paths';
+import { OUTPUTS_DIR, OUTPUT_TREE_FILENAME, BATCH_OUTPUTS_DIR } from '../config/paths';
 import { DocumentMetadata, DocumentStructure } from '../types/document';
 import { DocumentModel } from '../models/Document';
 
@@ -13,10 +13,12 @@ export class DocumentService {
    * Get all available documents from the outputs directory
    * Filtered by user's group permissions
    */
-  async getAllDocuments(userGroupIds: ObjectId[]): Promise<DocumentMetadata[]> {
+  async getAllDocuments(userGroupIds: ObjectId[], isAdmin = false): Promise<DocumentMetadata[]> {
     try {
       // Get documents user has access to from database
-      const accessibleDocs = await DocumentModel.findByGroupIds(userGroupIds);
+      const accessibleDocs = isAdmin
+        ? await DocumentModel.findAll()
+        : await DocumentModel.findByGroupIds(userGroupIds);
       const accessibleDocIds = new Set(accessibleDocs.map(doc => doc.documentId));
       
       const entries = await fs.readdir(OUTPUTS_DIR, { withFileTypes: true });
@@ -65,21 +67,28 @@ export class DocumentService {
    * Get a specific document's output_tree.json
    * Requires user to have permission
    */
-  async getDocumentById(documentId: string, userGroupIds: ObjectId[]): Promise<DocumentStructure> {
+  async getDocumentById(documentId: string, userGroupIds: ObjectId[], isAdmin = false): Promise<DocumentStructure> {
     try {
+      if (this.isBatchDocument(documentId)) {
+        return await this.getBatchDocumentStructure(documentId);
+      }
+
       // Check permissions first
-      const hasAccess = await this.checkAccess(documentId, userGroupIds);
-      if (!hasAccess) {
-        throw new Error('Access denied: You do not have permission to view this document');
+      if (!isAdmin) {
+        const hasAccess = await this.checkAccess(documentId, userGroupIds);
+        if (!hasAccess) {
+          throw new Error('Access denied: You do not have permission to view this document');
+        }
       }
 
       const outputTreePath = path.join(OUTPUTS_DIR, documentId, OUTPUT_TREE_FILENAME);
+      // const outputTreePath = path.join(OUTPUTS_DIR, OUTPUT_TREE_FILENAME);
       
       // Check if the file exists
       try {
         await fs.access(outputTreePath);
       } catch {
-        throw new Error(`Document with id "${documentId}" not found or missing output_tree.json`);
+        throw new Error(`Document with id "${documentId}" not found in path ${outputTreePath} or missing output_tree.json`);
       }
       
       // Read and parse the JSON file
@@ -94,6 +103,36 @@ export class DocumentService {
       console.error('Error reading document:', error);
       throw new Error('Failed to read document');
     }
+  }
+
+  private isBatchDocument(documentId: string) {
+    return documentId.includes(':');
+  }
+
+  private getBatchDocumentFolder(documentId: string) {
+    return documentId.replace(':', '_');
+  }
+
+  async getBatchDocumentStructure(documentId: string): Promise<DocumentStructure> {
+    const [batchJobId] = documentId.split(':');
+    const batchFolder = this.getBatchDocumentFolder(documentId);
+    const outputTreePath = path.join(
+      BATCH_OUTPUTS_DIR,
+      batchJobId,
+      batchFolder,
+      'output',
+      'processing',
+      'output_tree.json'
+    );
+
+    try {
+      await fs.access(outputTreePath);
+    } catch {
+      throw new Error(`Batch document "${documentId}" not found at ${outputTreePath}`);
+    }
+
+    const fileContent = await fs.readFile(outputTreePath, 'utf-8');
+    return JSON.parse(fileContent);
   }
 
   /**
@@ -113,12 +152,14 @@ export class DocumentService {
    * Get all images for a specific document
    * Requires user to have permission
    */
-  async getDocumentImages(documentId: string, userGroupIds: ObjectId[]): Promise<string[]> {
+  async getDocumentImages(documentId: string, userGroupIds: ObjectId[], isAdmin = false): Promise<string[]> {
     try {
       // Check permissions first
-      const hasAccess = await this.checkAccess(documentId, userGroupIds);
-      if (!hasAccess) {
-        throw new Error('Access denied: You do not have permission to view this document');
+      if (!isAdmin) {
+        const hasAccess = await this.checkAccess(documentId, userGroupIds);
+        if (!hasAccess) {
+          throw new Error('Access denied: You do not have permission to view this document');
+        }
       }
 
       const docPath = path.join(OUTPUTS_DIR, documentId);

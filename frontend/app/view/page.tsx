@@ -17,7 +17,7 @@ import * as Accordion from '@radix-ui/react-accordion'
 import { UserMenu } from '@/components/UserMenu'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { getDocumentById, getDocumentImages, getImageUrl, getPdfUrl } from '@/lib/api'
+import { getDocumentById, getDocumentImages, getImageUrl, getPdfUrl, isBatchFileId, getBatchFileStructure, getBatchFileImages, getBatchFileImageUrl, fetchBatchFilePdf } from '@/lib/api'
 import { DocumentStructure } from '@/types/document'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
@@ -37,18 +37,42 @@ if (typeof window !== 'undefined' && typeof Promise !== 'undefined' && !(Promise
 // Dynamically import react-pdf components (client-side only)
 const Document = dynamic(
   () => import('react-pdf').then((mod) => mod.Document),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="text-muted-foreground text-sm animate-pulse">Loading PDF viewer...</div> }
 )
 const Page = dynamic(
   () => import('react-pdf').then((mod) => mod.Page),
   { ssr: false }
 )
 
+// Track PDF.js worker initialization
+let pdfWorkerInitialized = false
+let pdfWorkerInitPromise: Promise<void> | null = null
+
 // Configure PDF.js worker (client-side only)
-if (typeof window !== 'undefined') {
-  import('react-pdf').then((pdfjs) => {
+const initPdfWorker = (): Promise<void> => {
+  if (typeof window === 'undefined') {
+    return Promise.resolve()
+  }
+  
+  if (pdfWorkerInitialized) {
+    return Promise.resolve()
+  }
+  
+  if (pdfWorkerInitPromise) {
+    return pdfWorkerInitPromise
+  }
+  
+  pdfWorkerInitPromise = import('react-pdf').then((pdfjs) => {
     pdfjs.pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.pdfjs.version}/build/pdf.worker.min.mjs`;
-  });
+    pdfWorkerInitialized = true
+  })
+  
+  return pdfWorkerInitPromise
+}
+
+// Start worker initialization immediately
+if (typeof window !== 'undefined') {
+  initPdfWorker()
 }
 
 type ContentType = 'text' | 'table' | 'image'
@@ -89,8 +113,25 @@ function ViewContent() {
   const [pdfUrl, setPdfUrl] = useState<string>('')
   const [contentFilter, setContentFilter] = useState<'all' | 'text' | 'table' | 'image'>('all')
   const [documentImages, setDocumentImages] = useState<string[]>([])
+  const [pdfWorkerReady, setPdfWorkerReady] = useState(false)
+  const [pdfDocumentReady, setPdfDocumentReady] = useState(false)
+
+  // Initialize PDF worker
+  useEffect(() => {
+    initPdfWorker().then(() => {
+      setPdfWorkerReady(true)
+    })
+  }, [])
+  
+  // Reset PDF document ready state when URL changes
+  useEffect(() => {
+    setPdfDocumentReady(false)
+    setNumPages(0)
+  }, [pdfUrl])
 
   useEffect(() => {
+    let blobUrlToRevoke: string | null = null
+    
     // Fetch the document structure from the backend
     const fetchDocument = async () => {
       if (!documentId) {
@@ -101,15 +142,36 @@ function ViewContent() {
 
       try {
         setLoading(true)
-        const data = await getDocumentById(documentId)
+        
+        const isBatchFile = isBatchFileId(documentId)
+        
+        // Fetch document structure - use different endpoints for batch files
+        const data = isBatchFile 
+          ? await getBatchFileStructure(documentId)
+          : await getDocumentById(documentId)
         setDocumentData(data)
         
         // Set the PDF URL from backend API
-        setPdfUrl(getPdfUrl(documentId))
+        // For batch files, fetch as blob (to include auth headers)
+        if (isBatchFile) {
+          try {
+            const pdfBlob = await fetchBatchFilePdf(documentId)
+            const blobUrl = URL.createObjectURL(pdfBlob)
+            blobUrlToRevoke = blobUrl
+            setPdfUrl(blobUrl)
+          } catch (pdfErr) {
+            console.error('Failed to load batch file PDF:', pdfErr)
+            setPdfUrl('')
+          }
+        } else {
+          setPdfUrl(getPdfUrl(documentId))
+        }
         
-        // Fetch images for this document
+        // Fetch images for this document - use different endpoints for batch files
         try {
-          const images = await getDocumentImages(documentId)
+          const images = isBatchFile
+            ? await getBatchFileImages(documentId)
+            : await getDocumentImages(documentId)
           setDocumentImages(images)
         } catch (imgErr) {
           console.error('Failed to load images:', imgErr)
@@ -127,10 +189,21 @@ function ViewContent() {
     }
 
     fetchDocument()
+    
+    // Cleanup blob URL on unmount or when documentId changes
+    return () => {
+      if (blobUrlToRevoke) {
+        URL.revokeObjectURL(blobUrlToRevoke)
+      }
+    }
   }, [documentId])
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages)
+    // Small delay to ensure PDF.js worker is fully ready before rendering pages
+    setTimeout(() => {
+      setPdfDocumentReady(true)
+    }, 100)
   }
 
   const handleExport = () => {
@@ -319,7 +392,9 @@ function ViewContent() {
                           </div>
                           <div className="flex justify-center items-center bg-muted/30 rounded-md p-4">
                             <img 
-                              src={getImageUrl(documentId || '', imageName)}
+                              src={documentId && isBatchFileId(documentId) 
+                                ? getBatchFileImageUrl(documentId, imageName)
+                                : getImageUrl(documentId || '', imageName)}
                               alt={imageName}
                               className="max-w-full h-auto rounded shadow-md"
                               loading="lazy"
@@ -441,7 +516,11 @@ function ViewContent() {
           </div>
           <div className="p-8 flex justify-center min-h-full">
             <div className="shadow-2xl">
-              {pdfUrl ? (
+              {!pdfWorkerReady ? (
+                <div className="flex items-center justify-center h-96 w-full">
+                  <div className="text-muted-foreground text-sm animate-pulse">Initializing PDF viewer...</div>
+                </div>
+              ) : pdfUrl ? (
                 <Document
                   file={pdfUrl}
                   onLoadSuccess={onDocumentLoadSuccess}
@@ -459,7 +538,7 @@ function ViewContent() {
                     </div>
                   }
                 >
-                  {Array.from(new Array(numPages), (el, index) => (
+                  {pdfDocumentReady && numPages > 0 && Array.from(new Array(numPages), (el, index) => (
                     <Page
                       key={`page_${index + 1}`}
                       pageNumber={index + 1}
@@ -467,6 +546,16 @@ function ViewContent() {
                       renderAnnotationLayer={true}
                       className="mb-8 shadow-lg"
                       width={600}
+                      error={
+                        <div className="flex items-center justify-center h-48 w-full bg-muted/50 rounded">
+                          <div className="text-muted-foreground text-sm">Failed to render page {index + 1}</div>
+                        </div>
+                      }
+                      loading={
+                        <div className="flex items-center justify-center h-48 w-full">
+                          <div className="text-muted-foreground text-sm animate-pulse">Loading page {index + 1}...</div>
+                        </div>
+                      }
                     />
                   ))}
                 </Document>

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import { documentService } from '../services/documentService';
+import { AuthService } from '../services/authService';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -23,8 +24,9 @@ router.get('/', async (req: Request, res: Response) => {
 
     // Get user's group IDs
     const userGroupIds = req.user.groupIds.map(groupId => new ObjectId(groupId));
+    const isAdminUser = AuthService.isInGroup(req.user, 'admin');
 
-    const documents = await documentService.getAllDocuments(userGroupIds);
+    const documents = await documentService.getAllDocuments(userGroupIds, isAdminUser);
     res.json({
       success: true,
       data: documents,
@@ -64,8 +66,9 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     // Get user's group IDs
     const userGroupIds = req.user.groupIds.map(groupId => new ObjectId(groupId));
+    const isAdminUser = AuthService.isInGroup(req.user, 'admin');
 
-    const documentStructure = await documentService.getDocumentById(id, userGroupIds);
+    const documentStructure = await documentService.getDocumentById(id, userGroupIds, isAdminUser);
     
     res.json({
       success: true,
@@ -123,8 +126,9 @@ router.get('/:id/images', async (req: Request, res: Response) => {
 
     // Get user's group IDs
     const userGroupIds = req.user.groupIds.map(groupId => new ObjectId(groupId));
+    const isAdminUser = AuthService.isInGroup(req.user, 'admin');
 
-    const images = await documentService.getDocumentImages(id, userGroupIds);
+    const images = await documentService.getDocumentImages(id, userGroupIds, isAdminUser);
     
     res.json({
       success: true,

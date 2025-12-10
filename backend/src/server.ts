@@ -3,6 +3,7 @@ import cors from 'cors';
 import documentRoutes from './routes/documentRoutes';
 import authRoutes from './routes/authRoutes';
 import adminRoutes from './routes/adminRoutes';
+import batchRoutes from './routes/batchRoutes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { OUTPUTS_DIR, PDFS_DIR } from './config/paths';
 import { connectToDatabase } from './config/database';
@@ -47,6 +48,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/batch_jobs', batchRoutes);
 
 // Error handling
 app.use(notFoundHandler);

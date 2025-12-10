@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { DocumentMetadata, DocumentStructure } from '@/types/document';
 import { LoginRequest, LoginResponse, User, UserGroup, DocumentPermission } from '@/types/auth';
+import { BatchJob } from '@/types/batch';
 
 // Create axios instance with base configuration
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002',
   timeout: 30000, // Increased to 30 seconds
   headers: {
     'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export const getDocumentImages = async (id: string): Promise<string[]> => {
  * Get the URL for a specific image
  */
 export const getImageUrl = (documentId: string, imageName: string): string => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://g2-wyn04.iind.intel.com:5002';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
   return `${baseUrl}/images/${documentId}/${imageName}`;
 };
 
@@ -92,9 +93,92 @@ export const getImageUrl = (documentId: string, imageName: string): string => {
  * Get the URL for a specific PDF document
  */
 export const getPdfUrl = (documentId: string): string => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://g2-wyn04.iind.intel.com:5002';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
   return `${baseUrl}/pdfs/${documentId}.pdf`;
 };
+
+/**
+ * Check if a document ID is a batch file ID
+ * Batch file IDs follow the pattern: {batch_job_id}:{filename}
+ * Examples: ALI10-1765274389.518018:pdf1.pdf, ALIX-1765262688.3141365:ts1.pdf
+ * The pattern is: alphanumeric-timestamp:filename
+ */
+export const isBatchFileId = (documentId: string): boolean => {
+  // Match pattern: {prefix}-{timestamp}:{filename}
+  // where prefix is alphanumeric, timestamp is numeric with dots, and filename is anything
+  return /^[A-Za-z0-9]+-[\d.]+:.+$/.test(documentId);
+};
+
+/**
+ * Get the URL for a batch job file's PDF
+ * Batch PDFs are served from: /api/batch_jobs/files/{fileId}/pdf
+ */
+export const getBatchFilePdfUrl = (fileId: string): string => {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+  return `${baseUrl}/api/batch_jobs/files/${encodeURIComponent(fileId)}/pdf`;
+};
+
+/**
+ * Fetch a batch job file's PDF as a blob (with authentication)
+ * This is needed because react-pdf can't add auth headers to direct URL requests
+ */
+export const fetchBatchFilePdf = async (fileId: string): Promise<Blob> => {
+  const response = await apiClient.get(
+    `/api/batch_jobs/files/${encodeURIComponent(fileId)}/pdf`,
+    { responseType: 'blob' }
+  );
+  return response.data;
+};
+
+/**
+ * Get the document structure for a batch job file
+ */
+export const getBatchFileStructure = async (fileId: string): Promise<DocumentStructure> => {
+  const response = await apiClient.get<ApiResponse<DocumentStructure>>(
+    `/api/batch_jobs/files/${encodeURIComponent(fileId)}/structure`
+  );
+  return response.data.data!;
+};
+
+/**
+ * Get the list of images for a batch job file
+ */
+export const getBatchFileImages = async (fileId: string): Promise<string[]> => {
+  const response = await apiClient.get<ApiResponse<string[]>>(
+    `/api/batch_jobs/files/${encodeURIComponent(fileId)}/images`
+  );
+  return response.data.data || [];
+};
+
+/**
+ * Get the URL for a batch job file image
+ */
+export const getBatchFileImageUrl = (fileId: string, imageName: string): string => {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+  return `${baseUrl}/api/batch_jobs/files/${encodeURIComponent(fileId)}/images/${encodeURIComponent(imageName)}`;
+};
+
+export const fetchBatchJobStatus = async (batchJobId: string): Promise<BatchJob> => {
+  const response = await apiClient.get<ApiResponse<BatchJob>>(
+    `/api/batch_jobs/${encodeURIComponent(batchJobId)}/status`
+  )
+
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.error || 'Failed to retrieve batch job status')
+  }
+
+  return response.data.data
+}
+
+export const fetchBatchJobs = async (): Promise<BatchJob[]> => {
+  const response = await apiClient.get<ApiResponse<BatchJob[]>>('/api/batch_jobs')
+
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.error || 'Failed to list batch jobs')
+  }
+
+  return response.data.data
+}
 
 // ============ AUTHENTICATION APIs ============
 
