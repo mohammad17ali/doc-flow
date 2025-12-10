@@ -77,7 +77,7 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://g2-wyn04.iind.intel.com:5001
+        NEXT_PUBLIC_API_URL: http://localhost:5001
     image: doc-flow-frontend:latest
     container_name: doc-flow-frontend
     ports:
