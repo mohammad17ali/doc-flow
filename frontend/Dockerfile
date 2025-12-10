@@ -62,9 +62,8 @@ RUN npm install --omit=dev --ignore-scripts
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 
-# If you're using custom config or instrumentation
+# Copy Next.js config
 COPY --from=builder /app/next.config.mjs ./
-COPY --from=builder /app/instrumentation.ts ./
 
 # Expose the correct port
 EXPOSE 3000
