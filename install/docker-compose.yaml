@@ -46,7 +46,7 @@ services:
       - BATCH_OUTPUTS_DIR=/data/batch_processing
       - PDFS_DIR=/data/pdfs
     volumes:
-      - /home/ritik-intel/ali/pdf-parser/AIComps/comps/pdf-parser/outputs:/data/outputs:ro
+      - /home/ritik-intel/pdf-results:/data/outputs:ro
       - /home/ritik-intel/ali/pdf-parser/AIComps/comps/pdf-parser/batch_processing:/data/batch_processing:ro
       - /home/ritik-intel/ali/pdf-parser/AIComps/comps/pdf-parser/pdfs:/data/pdfs:ro
     networks:
