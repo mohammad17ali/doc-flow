@@ -10,4 +10,5 @@ export const BATCH_OUTPUTS_DIR =
 
 export const PDFS_DIR = process.env.PDFS_DIR || '/home/alimohammad/pdf-parser';
 
+
 export const OUTPUT_TREE_FILENAME = '/outputs/processing/output_tree.json';
