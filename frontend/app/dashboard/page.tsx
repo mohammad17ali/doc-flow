@@ -46,7 +46,7 @@ function DashboardContent() {
   const [documents, setDocuments] = useState<DocumentMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'single' | 'batch'>('single')
+  const [viewMode, setViewMode] = useState<'single' | 'batch'>('batch')
   const [batchJobs, setBatchJobs] = useState<BatchJob[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchError, setBatchError] = useState<string | null>(null)

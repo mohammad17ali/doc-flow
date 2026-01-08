@@ -17,7 +17,7 @@ import * as Accordion from '@radix-ui/react-accordion'
 import { UserMenu } from '@/components/UserMenu'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { getDocumentById, getDocumentImages, getImageUrl, getPdfUrl, isBatchFileId, getBatchFileStructure, getBatchFileImages, getBatchFileImageUrl, fetchBatchFilePdf } from '@/lib/api'
+import { getDocumentById, getDocumentImages, getImageUrl, getPdfUrl, isBatchFileId, getBatchFileStructure, getBatchFileImages, getBatchFileImageUrl, fetchBatchFilePdf, fetchBatchFileImage } from '@/lib/api'
 import { DocumentStructure } from '@/types/document'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
@@ -113,6 +113,7 @@ function ViewContent() {
   const [pdfUrl, setPdfUrl] = useState<string>('')
   const [contentFilter, setContentFilter] = useState<'all' | 'text' | 'table' | 'image'>('all')
   const [documentImages, setDocumentImages] = useState<string[]>([])
+  const [batchImageUrls, setBatchImageUrls] = useState<Record<string, string>>({})
   const [pdfWorkerReady, setPdfWorkerReady] = useState(false)
   const [pdfDocumentReady, setPdfDocumentReady] = useState(false)
 
@@ -197,6 +198,46 @@ function ViewContent() {
       }
     }
   }, [documentId])
+
+  // Fetch batch image blobs when document images change
+  useEffect(() => {
+    if (!documentId || !isBatchFileId(documentId) || documentImages.length === 0) {
+      setBatchImageUrls({})
+      return
+    }
+
+    let isMounted = true
+
+    const fetchImageBlobs = async () => {
+      const urls: Record<string, string> = {}
+      
+      for (const imageName of documentImages) {
+        try {
+          const imageBlob = await fetchBatchFileImage(documentId, imageName)
+          const objectUrl = URL.createObjectURL(imageBlob)
+          urls[imageName] = objectUrl
+        } catch (err) {
+          console.error(`Failed to load image ${imageName}:`, err)
+        }
+      }
+      
+      if (isMounted) {
+        setBatchImageUrls(urls)
+      }
+    }
+
+    fetchImageBlobs()
+
+    // Cleanup blob URLs on unmount or when images change
+    return () => {
+      isMounted = false
+      // Revoke all blob URLs from the current state
+      setBatchImageUrls(prevUrls => {
+        Object.values(prevUrls).forEach(url => URL.revokeObjectURL(url))
+        return {}
+      })
+    }
+  }, [documentId, documentImages])
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages)
@@ -390,15 +431,26 @@ function ViewContent() {
                               IMAGE
                             </span>
                           </div>
-                          <div className="flex justify-center items-center bg-muted/30 rounded-md p-4">
-                            <img 
-                              src={documentId && isBatchFileId(documentId) 
-                                ? getBatchFileImageUrl(documentId, imageName)
-                                : getImageUrl(documentId || '', imageName)}
-                              alt={imageName}
-                              className="max-w-full h-auto rounded shadow-md"
-                              loading="lazy"
-                            />
+                          <div className="flex justify-center items-center bg-muted/30 rounded-md p-4 min-h-48">
+                            {documentId && isBatchFileId(documentId) ? (
+                              batchImageUrls[imageName] ? (
+                                <img 
+                                  src={batchImageUrls[imageName]}
+                                  alt={imageName}
+                                  className="max-w-full h-auto rounded shadow-md"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="text-muted-foreground text-sm animate-pulse">Loading image...</div>
+                              )
+                            ) : (
+                              <img 
+                                src={getImageUrl(documentId || '', imageName)}
+                                alt={imageName}
+                                className="max-w-full h-auto rounded shadow-md"
+                                loading="lazy"
+                              />
+                            )}
                           </div>
                         </div>
                       </div>

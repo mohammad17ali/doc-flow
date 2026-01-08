@@ -21,6 +21,14 @@ export class DocumentService {
         : await DocumentModel.findByGroupIds(userGroupIds);
       const accessibleDocIds = new Set(accessibleDocs.map(doc => doc.documentId));
       
+      // Check if OUTPUTS_DIR exists before trying to read it
+      try {
+        await fs.access(OUTPUTS_DIR);
+      } catch {
+        // Directory doesn't exist, return empty list
+        return [];
+      }
+      
       const entries = await fs.readdir(OUTPUTS_DIR, { withFileTypes: true });
       
       const documents: DocumentMetadata[] = [];
@@ -162,6 +170,11 @@ export class DocumentService {
         }
       }
 
+      // Check if this is a batch document (contains colon)
+      if (this.isBatchDocument(documentId)) {
+        return await this.getBatchDocumentImages(documentId);
+      }
+
       const docPath = path.join(OUTPUTS_DIR, documentId);
       
       // Check if the directory exists
@@ -191,6 +204,40 @@ export class DocumentService {
       console.error('Error reading document images:', error);
       throw new Error('Failed to read document images');
     }
+  }
+
+  private async getBatchDocumentImages(documentId: string): Promise<string[]> {
+    const [batchJobId] = documentId.split(':');
+    const batchFolder = this.getBatchDocumentFolder(documentId);
+    
+    // Images could be in multiple locations - check the output folder
+    const outputPath = path.join(
+      BATCH_OUTPUTS_DIR,
+      batchJobId,
+      batchFolder,
+      'output',
+      'processing'
+    );
+
+    try {
+      await fs.access(outputPath);
+    } catch {
+      throw new Error(`Batch document "${documentId}" not found at ${outputPath}`);
+    }
+
+    const entries = await fs.readdir(outputPath, { withFileTypes: true });
+    
+    // Filter for image files (jpeg, jpg, png)
+    const images = entries
+      .filter(entry => {
+        if (!entry.isFile()) return false;
+        const ext = path.extname(entry.name).toLowerCase();
+        return ['.jpeg', '.jpg', '.png'].includes(ext);
+      })
+      .map(entry => entry.name)
+      .sort(); // Sort alphabetically
+    
+    return images;
   }
 
 }

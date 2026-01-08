@@ -100,13 +100,13 @@ export const getPdfUrl = (documentId: string): string => {
 /**
  * Check if a document ID is a batch file ID
  * Batch file IDs follow the pattern: {batch_job_id}:{filename}
- * Examples: ALI10-1765274389.518018:pdf1.pdf, ALIX-1765262688.3141365:ts1.pdf
- * The pattern is: alphanumeric-timestamp:filename
+ * Examples: ALI10-1765274389.518018:pdf1.pdf, ALIX-1765262688.3141365:ts1.pdf, ALI_New-1765433117.634705:ts_13814101v160700p.pdf
+ * The pattern is: alphanumeric_-timestamp:filename
  */
 export const isBatchFileId = (documentId: string): boolean => {
   // Match pattern: {prefix}-{timestamp}:{filename}
-  // where prefix is alphanumeric, timestamp is numeric with dots, and filename is anything
-  return /^[A-Za-z0-9]+-[\d.]+:.+$/.test(documentId);
+  // where prefix is alphanumeric/underscore, timestamp is numeric with dots, and filename is anything
+  return /^[A-Za-z0-9_]+-[\d.]+:.+$/.test(documentId);
 };
 
 /**
@@ -156,6 +156,18 @@ export const getBatchFileImages = async (fileId: string): Promise<string[]> => {
 export const getBatchFileImageUrl = (fileId: string, imageName: string): string => {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
   return `${baseUrl}/api/batch_jobs/files/${encodeURIComponent(fileId)}/images/${encodeURIComponent(imageName)}`;
+};
+
+/**
+ * Fetch a batch job file image as a blob (with authentication)
+ * This is needed because img tags can't send auth headers
+ */
+export const fetchBatchFileImage = async (fileId: string, imageName: string): Promise<Blob> => {
+  const response = await apiClient.get(
+    `/api/batch_jobs/files/${encodeURIComponent(fileId)}/images/${encodeURIComponent(imageName)}`,
+    { responseType: 'blob' }
+  );
+  return response.data;
 };
 
 export const fetchBatchJobStatus = async (batchJobId: string): Promise<BatchJob> => {
